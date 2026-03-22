@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Thalweg — Maritime Intelligence Platform
 
-## Getting Started
+> Real-time global maritime intelligence. 24,000+ live vessels.
+> Port congestion. Sanctions detection. IUU fishing. Ocean temperature.
+> Free. Open source. Built in 48 hours.
 
-First, run the development server:
+![Globe](public/screenshot.png)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Live Features
+- **24,391 live vessels** from global AIS network, updating in real-time
+- **Port Congestion Engine** — 50 global ports, 0–100 index, 72-hour prediction
+- **Sanctions Layer** — 43 sanctioned vessels flagged from OpenSanctions (OFAC/EU/UK/UN)
+- **IUU Fishing Detection** — Global Fishing Watch events cross-referenced against 30 MPAs
+- **SST Overlay** — NOAA sea surface temperature grid, toggleable
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Stack
+- **Frontend**: Next.js 14, TypeScript, deck.gl 8.9.35 (WebGL2)
+- **Database**: Supabase PostgreSQL + PostGIS
+- **Edge Functions**: Deno (Supabase Edge Runtime)
+- **Automation**: pg_cron + pg_net
+- **Data Sources**: AISStream.io, OpenSanctions, Global Fishing Watch, NOAA ERDDAP
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Architecture
+AISStream.io WebSocket → Supabase Edge Function → PostgreSQL
+↓
+Port Congestion Engine (5 min)
+Sanctions Sync (daily 07:00 UTC)
+GFW Fishing Sync (daily 08:00 UTC)
+SST Sync (daily 06:00 UTC)
+↓
+Next.js → deck.gl Globe → Float32Array GPU buffers
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+text
 
-## Learn More
+## Data Sources
+All free, all open:
+- [AISStream.io](https://aisstream.io) — Real-time AIS
+- [OpenSanctions](https://opensanctions.org) — Sanctions lists
+- [Global Fishing Watch](https://globalfishingwatch.org) — Fishing events
+- [NOAA ERDDAP](https://coastwatch.pfeg.noaa.gov/erddap) — Sea surface temperature
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+AGPL-3.0
