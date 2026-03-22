@@ -9,14 +9,37 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import DeckGL from '@deck.gl/react';
 import { _GlobeView as GlobeView } from '@deck.gl/core';
-import { ScatterplotLayer, GeoJsonLayer } from '@deck.gl/layers';
+import { ScatterplotLayer, GeoJsonLayer, GridCellLayer } from '@deck.gl/layers';
 import { useVesselStream } from '@/hooks/useVesselStream';
 import { hexToRgb, type VesselRow, type GlobeData, NAV_STATUS_LABELS } from '@/types/vessel';
 import VesselPanel from './VesselPanel';
+import { usePortCongestion } from '@/hooks/usePortCongestion';
+import type { PortWithCongestion } from '@/hooks/usePortCongestion';
+import PortPanel from './PortPanel';
 
 // Natural Earth 110m land polygons — public domain, no API key required
 const LAND_DATA_URL =
     'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_110m_land.geojson';
+
+function congestionColor(index: number): [number, number, number, number] {
+    if (index <= 25)  return [0,   255, 136, 220];  // green  — NORMAL
+    if (index <= 50)  return [255, 200, 0,   230];  // yellow — ELEVATED
+    if (index <= 75)  return [255, 140, 0,   240];  // orange — CONGESTED
+    return              [255, 68,  68,  255];        // red    — SEVERE
+}
+
+// Maps SST value (°C) to RGBA colour
+// Cold: deep blue (-2°C) → Cool: cyan (10°C) → Warm: yellow (22°C) → Hot: red (32°C)
+function sstColor(sst: number): [number, number, number, number] {
+    if (sst <= -2)  return [0,   0,   139, 180];
+    if (sst <= 5)   return [0,   105, 200, 170];
+    if (sst <= 10)  return [0,   200, 220, 160];
+    if (sst <= 15)  return [0,   230, 180, 150];
+    if (sst <= 20)  return [80,  220, 100, 140];
+    if (sst <= 25)  return [255, 200, 0,   140];
+    if (sst <= 29)  return [255, 120, 0,   150];
+    return                 [220, 30,  30,  160];
+}
 
 const INITIAL_VIEW_STATE = {
     longitude: 75,
@@ -38,6 +61,24 @@ export default function GlobeViewComponent() {
     const [globeData, setGlobeData] = useState<GlobeData>(EMPTY_GLOBE_DATA);
     const [selectedVessel, setSelectedVessel] = useState<VesselRow | null>(null);
     const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; vessel: VesselRow } | null>(null);
+    const { ports } = usePortCongestion();
+    const [selectedPort, setSelectedPort] = useState<PortWithCongestion | null>(null);
+
+    const [sstData, setSstData] = useState<
+        { lat: number; lon: number; sst: number }[]
+    >([]);
+    const [sstVisible, setSstVisible] = useState(true);
+
+    useEffect(() => {
+        const SST_URL = process.env.NEXT_PUBLIC_SUPABASE_URL +
+            '/storage/v1/object/public/ocean-data/sst/global-latest.json';
+        fetch(SST_URL)
+            .then((r) => r.json())
+            .then((tile) => {
+                if (tile?.points) setSstData(tile.points);
+            })
+            .catch((e) => console.warn('[SST] Failed to load:', e));
+    }, []);
 
     // ── 500ms batch timer ─────────────────────────────────────────────────────
     // Reads from vesselMapRef (no React dependency), builds Float32Array,
@@ -80,6 +121,39 @@ export default function GlobeViewComponent() {
 
     // ── deck.gl layers ─────────────────────────────────────────────────────────
     const layers = [
+        new GridCellLayer({
+            id: 'sst',
+            data: sstData,
+            visible: sstVisible,
+            getPosition: (d: { lat: number; lon: number; sst: number }) => [d.lon, d.lat],
+            getFillColor: (d: { lat: number; lon: number; sst: number }) => sstColor(d.sst),
+            cellSize: 110000,     // ~1 degree in meters — matches ERDDAP grid stride
+            elevationScale: 0,    // flat — no 3D extrusion on globe
+            extruded: false,
+            pickable: false,      // SST layer is not interactive — vessels/ports take priority
+            opacity: 0.55,
+        }),
+
+        new ScatterplotLayer({
+            id: 'ports',
+            data: ports,
+            getPosition: (d: PortWithCongestion) => [d.lon, d.lat],
+            getFillColor: (d: PortWithCongestion) => congestionColor(d.congestion_index),
+            getLineColor: [255, 255, 255, 180],
+            getRadius: 35000,
+            radiusMinPixels: 5,
+            radiusMaxPixels: 18,
+            stroked: true,
+            lineWidthMinPixels: 1.5,
+            pickable: true,
+            onClick: ({ object }: { object: PortWithCongestion }) => {
+                if (object) {
+                    setSelectedVessel(null);
+                    setSelectedPort(object);
+                }
+            },
+        }),
+
         new GeoJsonLayer({
             id: 'land',
             data: LAND_DATA_URL,
@@ -176,6 +250,17 @@ export default function GlobeViewComponent() {
                             {dataFreshness.toLocaleTimeString('en-GB', { hour12: false })} UTC
                         </span>
                     )}
+
+                    <button
+                        onClick={() => setSstVisible((v) => !v)}
+                        className={`text-xs font-data px-2 py-0.5 rounded border transition-colors ${
+                            sstVisible
+                                ? 'border-accent-cyan text-accent-cyan'
+                                : 'border-text-muted text-text-muted'
+                        }`}
+                    >
+                        SST
+                    </button>
                 </div>
             </div>
 
@@ -237,6 +322,13 @@ export default function GlobeViewComponent() {
                 <VesselPanel
                     vessel={selectedVessel}
                     onClose={() => setSelectedVessel(null)}
+                />
+            )}
+
+            {selectedPort && (
+                <PortPanel
+                    port={selectedPort}
+                    onClose={() => setSelectedPort(null)}
                 />
             )}
         </div>
