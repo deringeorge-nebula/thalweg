@@ -6,7 +6,7 @@
 // DO NOT add React state updates inside Realtime callbacks.
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import DeckGL from '@deck.gl/react';
 import { _GlobeView as GlobeView } from '@deck.gl/core';
 import { ScatterplotLayer, GeoJsonLayer, GridCellLayer } from '@deck.gl/layers';
@@ -68,6 +68,12 @@ export default function GlobeViewComponent() {
         { lat: number; lon: number; sst: number }[]
     >([]);
     const [sstVisible, setSstVisible] = useState(true);
+    const [darkFleetVisible, setDarkFleetVisible] = useState(true);
+
+    const darkFleetVessels = useMemo(
+        () => globeData.vessels.filter((v: any) => (v.darkFleetScore ?? v.dark_fleet_score ?? 0) >= 60),
+        [globeData.vessels]
+    );
 
     useEffect(() => {
         const SST_URL = process.env.NEXT_PUBLIC_SUPABASE_URL +
@@ -132,6 +138,32 @@ export default function GlobeViewComponent() {
             extruded: false,
             pickable: false,      // SST layer is not interactive — vessels/ports take priority
             opacity: 0.55,
+        }),
+
+        new ScatterplotLayer({
+            id: 'dark-fleet',
+            data: darkFleetVessels,
+            visible: darkFleetVisible,
+            getPosition: (d: any) => [d.lon, d.lat],
+            getFillColor: (d: any) => {
+                const s = d.darkFleetScore ?? d.dark_fleet_score ?? 0;
+                if (s >= 80) return [255, 30,  30,  255]; // EXTREME — bright red
+                if (s >= 70) return [255, 100, 0,   255]; // HIGH    — orange-red
+                return              [255, 165, 0,   240]; // MEDIUM  — orange
+            },
+            getLineColor: [255, 255, 255, 200],
+            getRadius: 25000,
+            radiusMinPixels: 6,
+            radiusMaxPixels: 20,
+            stroked: true,
+            lineWidthMinPixels: 2,
+            pickable: true,
+            onClick: ({ object }: { object: any }) => {
+                if (object) setSelectedVessel(object);
+            },
+            updateTriggers: {
+                getFillColor: darkFleetVessels.length,
+            },
         }),
 
         new ScatterplotLayer({
@@ -260,6 +292,16 @@ export default function GlobeViewComponent() {
                         }`}
                     >
                         SST
+                    </button>
+                    <button
+                        onClick={() => setDarkFleetVisible((v) => !v)}
+                        className={`text-xs font-data px-2 py-0.5 rounded border transition-colors ${
+                            darkFleetVisible
+                                ? 'border-alert-critical text-alert-critical'
+                                : 'border-text-muted text-text-muted'
+                        }`}
+                    >
+                        DARK FLEET
                     </button>
                 </div>
             </div>
