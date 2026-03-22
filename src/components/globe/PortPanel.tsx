@@ -1,7 +1,9 @@
 // src/components/globe/PortPanel.tsx
 'use client';
 
-import { X, Anchor } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { generatePortBrief } from '@/lib/intelligenceBrief';
+import { X, Anchor, Sparkles, Loader2, AlertTriangle } from 'lucide-react';
 import type { PortWithCongestion } from '@/hooks/usePortCongestion';
 
 interface Props {
@@ -50,6 +52,30 @@ function PredictionBar({
 }
 
 export default function PortPanel({ port, onClose }: Props) {
+    const [brief, setBrief] = useState<string | null>(null);
+    const [briefLoading, setBriefLoading] = useState(false);
+    const [briefError, setBriefError] = useState<string | null>(null);
+
+    async function handleGenerateBrief() {
+        setBriefLoading(true);
+        setBriefError(null);
+        setBrief(null);
+        try {
+            const result = await generatePortBrief(port.id);
+            setBrief(result.brief);
+        } catch (e) {
+            setBriefError(e instanceof Error ? e.message : 'Brief generation failed');
+        } finally {
+            setBriefLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        setBrief(null);
+        setBriefError(null);
+        setBriefLoading(false);
+    }, [port.id]);
+
     const statusColor = STATUS_COLORS[port.congestion_status] ?? 'text-white';
     const barColor = BAR_COLORS[port.congestion_status] ?? 'bg-accent-cyan';
 
@@ -152,6 +178,55 @@ export default function PortPanel({ port, onClose }: Props) {
                         UTC · recalculates every 5 min
                     </div>
                 )}
+
+                {/* AI Intelligence Brief */}
+                <div className="border-t border-glow pt-3 mt-1">
+                    <button
+                        onClick={handleGenerateBrief}
+                        disabled={briefLoading}
+                        className="w-full flex items-center justify-center gap-2 py-2 px-3
+                            rounded border border-accent-cyan text-accent-cyan text-xs font-data
+                            hover:bg-accent-cyan hover:text-navy-950 transition-all duration-200
+                            disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {briefLoading ? (
+                            <>
+                                <Loader2 size={13} className="animate-spin" />
+                                GENERATING BRIEF...
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles size={13} />
+                                GENERATE INTELLIGENCE BRIEF
+                            </>
+                        )}
+                    </button>
+
+                    {briefError && (
+                        <div className="mt-2 flex items-start gap-2 text-alert-critical text-xs font-body">
+                            <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
+                            <span>{briefError}</span>
+                        </div>
+                    )}
+
+                    {brief && (
+                        <div className="mt-3 p-3 rounded bg-white/5 border border-glow">
+                            <div className="flex items-center gap-1.5 mb-2">
+                                <Sparkles size={11} className="text-accent-cyan" />
+                                <span className="text-accent-cyan text-xs font-data tracking-widest">
+                                    AI INTELLIGENCE BRIEF
+                                </span>
+                            </div>
+                            <div className="text-text-secondary text-xs font-body leading-relaxed
+                                whitespace-pre-wrap max-h-72 overflow-y-auto">
+                                {brief}
+                            </div>
+                            <div className="text-text-muted text-xs font-data mt-2 text-right">
+                                llama-3.3-70b · groq
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
