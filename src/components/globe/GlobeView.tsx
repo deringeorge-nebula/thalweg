@@ -409,7 +409,7 @@ export default function GlobeViewComponent() {
                     </div>
                     <div className="text-text-muted text-xs font-data">
                         {hoverInfo.vessel.type_category || 'Unknown'} ·{' '}
-                        {hoverInfo.vessel.sog != null ? `${hoverInfo.vessel.sog.toFixed(1)} kn` : '—'}
+                        {hoverInfo.vessel.sog != null ? `${hoverInfo.vessel.sog.toFixed(1)} kn` : '-'}
                     </div>
                 </div>
             )}

@@ -25,11 +25,11 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Thalweg — Free Maritime Intelligence',
+  title: 'Thalweg - Free Maritime Intelligence',
   description: '29,547 live vessels. Sanctions screening. Dark fleet detection. Port congestion forecasts. Free, open-source maritime intelligence built on public data.',
   metadataBase: new URL('https://thalweg.vercel.app'),
   openGraph: {
-    title: 'Thalweg — Free Maritime Intelligence',
+    title: 'Thalweg - Free Maritime Intelligence',
     description: '29,547 live vessels. Sanctions screening. Dark fleet detection. Port congestion forecasts. Open source.',
     url: 'https://thalweg.vercel.app',
     siteName: 'Thalweg',
@@ -38,14 +38,14 @@ export const metadata: Metadata = {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'Thalweg — real-time global maritime intelligence platform showing 29,547 vessels on a 3D globe',
+        alt: 'Thalweg - real-time global maritime intelligence tool showing 29,547 vessels on a 3D globe',
       },
     ],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Thalweg — Free Maritime Intelligence',
+    title: 'Thalweg - Free Maritime Intelligence',
     description: '29,547 live vessels. Sanctions screening. Dark fleet detection. Free and open source.',
     images: ['/og-image.png'],
   },
