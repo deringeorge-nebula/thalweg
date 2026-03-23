@@ -6,7 +6,7 @@
 [![Vessels Tracked](https://img.shields.io/badge/Vessels_Tracked-29%2C547-orange.svg)](https://thalweg.vercel.app)
 [![GitHub Stars](https://img.shields.io/github/stars/deringeorge-nebula/thalweg.svg?style=social&label=Star)](https://github.com/deringeorge-nebula/thalweg)
 
-<!-- screenshot -->
+![Thalweg globe showing 29,547 live vessels, piracy incidents, and dark fleet candidates](docs/screenshot.png)
 
 I'm a third-year naval architecture student from Visakhapatnam. The tools that answer real maritime questions - sanctions screening, dark fleet detection, port congestion forecasting - cost $200,000 a year. Dryad Global. Windward. Built for governments and shipping conglomerates. I built Thalweg in 30 days, on a free tier, using only public data. It doesn't do everything they do. But it does more than most people expect from a student project with a zero budget.
 
