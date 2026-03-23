@@ -1,10 +1,10 @@
 # Thalweg
 ### Free maritime intelligence. 29,547 vessels. Zero budget.
 
-![Live Demo](https://thalweg.vercel.app)
-![License: AGPL-3.0](LICENSE)
-![Vessels Tracked](https://thalweg.vercel.app)
-![GitHub Stars](https://github.com/deringeorge-nebula/thalweg/stargazers)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen.svg)](https://thalweg.vercel.app)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE)
+[![Vessels Tracked](https://img.shields.io/badge/Vessels_Tracked-29%2C547-orange.svg)](https://thalweg.vercel.app)
+[![GitHub Stars](https://img.shields.io/github/stars/deringeorge-nebula/thalweg.svg?style=social&label=Star)](https://github.com/deringeorge-nebula/thalweg)
 
 <!-- screenshot -->
 
@@ -54,34 +54,34 @@ Everything comes from free public sources. No scraping. No terms-of-service viol
 AIS positions stream in over WebSocket, get batched every 500ms by `ais-relay`, and land in a Supabase `vessels` table with PostGIS geometry. From there, four scheduled edge functions run independently: `anomaly-detection` every 10 minutes, `dark-fleet-scorer` every 30 minutes, `sts-detection` every 15 minutes (ship-to-ship transfer detection), and `port-congestion` every 5 minutes. NOAA SST tiles and Global Fishing Watch events sync daily. The Next.js frontend reads everything through Supabase's Postgres API. When you request an intelligence brief, a single edge function assembles the vessel's full record and sends it to Groq. The response streams back in under 3 seconds.
 ```mermaid
 flowchart TD
-    A([AISStream.io WebSocket]) --> B[ais-relay\\nEdge Function]
-    B --> C[(vessels table\\n28k rows, PostGIS)]
+    A([AISStream.io WebSocket]) --> B["ais-relay<br>Edge Function"]
+    B --> C[("vessels table<br>28k rows, PostGIS")]
 
-    D([NOAA ERDDAP]) --> E[sst-sync\\nEdge Function]
-    E --> F[(Supabase Storage\\n94KB JSON tile)]
+    D([NOAA ERDDAP]) --> E["sst-sync<br>Edge Function"]
+    E --> F[("Supabase Storage<br>94KB JSON tile")]
 
-    G([Global Fishing Watch API]) --> H[gfw-sync\\nEdge Function]
+    G([Global Fishing Watch API]) --> H["gfw-sync<br>Edge Function"]
     H --> I[(fishing_events table)]
 
-    J([OpenSanctions API]) --> K[sanctions-sync\\nEdge Function]
-    K --> L[(sanctioned_vessels table\\n+ vessels.sanctions_match flag)]
+    J([OpenSanctions API]) --> K["sanctions-sync<br>Edge Function"]
+    K --> L[("sanctioned_vessels table<br>+ vessels.sanctions_match flag")]
 
-    C --> M[anomaly-detection\\nevery 10 min]
+    C --> M["anomaly-detection<br>every 10 min"]
     M --> N[(anomalies table)]
 
-    C --> O[dark-fleet-scorer\\nevery 30 min]
+    C --> O["dark-fleet-scorer<br>every 30 min"]
     O --> P[(vessels.dark_fleet_score)]
 
-    C --> Q[sts-detection\\nevery 15 min]
+    C --> Q["sts-detection<br>every 15 min"]
     Q --> R[(sts_events table)]
 
-    C --> S[port-congestion\\nevery 5 min]
+    C --> S["port-congestion<br>every 5 min"]
     S --> T[(port_congestion table)]
 
-    C & N & P & R & T & I & F --> U[Next.js Frontend\\ndeck.gl GlobeView]
+    C & N & P & R & T & I & F --> U["Next.js Frontend<br>deck.gl GlobeView"]
 
-    U -->|User clicks vessel or port| V[intelligence-brief\\nEdge Function]
-    V --> W([Groq API\\nllama-3.3-70b-versatile])
+    U -->|User clicks vessel or port| V["intelligence-brief<br>Edge Function"]
+    V --> W(["Groq API<br>llama-3.3-70b-versatile"])
     W --> U
 ```
 
@@ -280,7 +280,7 @@ This is a research tool. It has real limitations worth knowing before you use it
 
 AGPL-3.0. If you fork this and run it as a service, your modifications have to be open source too. That's the deal.
 
-Full license text: LICENSE
+Full license text: [LICENSE](LICENSE)
 
 ---
 
