@@ -10,6 +10,8 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import DeckGL from '@deck.gl/react';
 import { _GlobeView as GlobeView } from '@deck.gl/core';
 import { ScatterplotLayer, GeoJsonLayer, GridCellLayer } from '@deck.gl/layers';
+import usePiracyData, { PiracyIncident } from '@/hooks/usePiracyData';
+import PiracyPanel from '../panels/PiracyPanel';
 import { useVesselStream } from '@/hooks/useVesselStream';
 import { hexToRgb, type VesselRow, type GlobeData, NAV_STATUS_LABELS } from '@/types/vessel';
 import VesselPanel from './VesselPanel';
@@ -69,6 +71,9 @@ export default function GlobeViewComponent() {
     >([]);
     const [sstVisible, setSstVisible] = useState(true);
     const [darkFleetVisible, setDarkFleetVisible] = useState(true);
+    const [showPiracy, setShowPiracy] = useState(true);
+    const [selectedPiracy, setSelectedPiracy] = useState<PiracyIncident | null>(null);
+    const { incidents: piracyIncidents, riskZones } = usePiracyData();
 
     const darkFleetVessels = useMemo(
         () => globeData.vessels.filter((v: any) => (v.darkFleetScore ?? v.dark_fleet_score ?? 0) >= 60),
@@ -196,6 +201,45 @@ export default function GlobeViewComponent() {
             lineWidthMinPixels: 0.5,
         }),
 
+        // Piracy Risk Zones
+        ...(showPiracy ? [new ScatterplotLayer({
+            id: 'piracy-zones',
+            data: riskZones,
+            getPosition: (d: any) => [d.center_lon, d.center_lat],
+            getRadius: (d: any) => d.radius_nm * 1852, // nm to meters
+            getFillColor: (d: any) => d.risk_level === 'CRITICAL' ? [255, 68, 68, 30] : [255, 140, 0, 30],
+            getLineColor: (d: any) => d.risk_level === 'CRITICAL' ? [255, 68, 68, 150] : [255, 140, 0, 150],
+            lineWidthMinPixels: 1,
+            stroked: true,
+            pickable: false,
+        })] : []),
+
+        // Piracy Incidents ScatterplotLayer
+        ...(showPiracy ? [new ScatterplotLayer({
+          id: 'piracy-incidents',
+          data: piracyIncidents,
+          getPosition: (d: PiracyIncident) => [d.lon, d.lat],
+          getRadius: (d: PiracyIncident) => d.attack_type === 'HIJACKED' ? 45000 : d.attack_type === 'FIRED_UPON' ? 35000 : 25000,
+          getFillColor: (d: PiracyIncident) => {
+            switch (d.attack_type) {
+              case 'HIJACKED':    return [255, 68, 68, 220]   // alert-critical red
+              case 'FIRED_UPON':  return [255, 140, 0, 200]   // alert-warning orange
+              case 'BOARDED':     return [255, 200, 0, 180]   // yellow
+              default:            return [100, 180, 255, 160]  // blue for approached/suspicious
+            }
+          },
+          radiusMinPixels: 4,
+          radiusMaxPixels: 18,
+          stroked: true,
+          getLineColor: [255, 255, 255, 120],
+          lineWidthMinPixels: 1,
+          pickable: true,
+          onClick: ({ object }: { object: any }) => {
+            if (object) setSelectedPiracy(object as PiracyIncident)
+          },
+          updateTriggers: { getFillColor: [], getRadius: [] }
+        })] : []),
+
         new ScatterplotLayer({
             id: 'vessels',
             data: {
@@ -303,6 +347,17 @@ export default function GlobeViewComponent() {
                     >
                         DARK FLEET
                     </button>
+                    {/* PIRACY button */}
+                    <button
+                        onClick={() => setShowPiracy(p => !p)}
+                        className={`px-3 py-1 rounded text-xs font-data font-medium border transition-all ${
+                            showPiracy
+                                ? 'bg-red-900/40 border-red-500 text-red-400'
+                                : 'bg-navy-950/40 border-gray-600 text-gray-400 hover:border-gray-400'
+                        }`}
+                    >
+                        PIRACY
+                    </button>
                 </div>
             </div>
 
@@ -360,6 +415,12 @@ export default function GlobeViewComponent() {
             )}
 
             {/* ── Vessel detail panel ────────────────────────────────────────────── */}
+            {selectedPiracy && (
+                <PiracyPanel
+                    incident={selectedPiracy}
+                    onClose={() => setSelectedPiracy(null)}
+                />
+            )}
             {selectedVessel && (
                 <VesselPanel
                     vessel={selectedVessel}

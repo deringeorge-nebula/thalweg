@@ -212,7 +212,7 @@ Deno.serve(async (_req: Request) => {
         const cutoff = new Date(now - 60 * 60 * 1000).toISOString(); // 1 hour window
 
         // Single bulk query — fetch all active anomaly keys in the last hour
-        const candidateMmsis = [...new Set(newAnomalies.map((a) => a.mmsi as string))];
+        const candidateMmsis = Array.from(new Set(newAnomalies.map((a) => a.mmsi as string)));
 
         const { data: existingAnomalies } = await supabase
             .from("anomalies")
@@ -235,7 +235,10 @@ Deno.serve(async (_req: Request) => {
         if (toInsert.length > 0) {
             const { error: insertErr } = await supabase
                 .from("anomalies")
-                .insert(toInsert);
+                .upsert(toInsert, {
+                    onConflict: 'mmsi,anomaly_type',
+                    ignoreDuplicates: false
+                });
             if (insertErr) console.error("[anomaly-detection] Insert error:", insertErr.message);
         }
 
