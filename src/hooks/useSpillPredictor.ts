@@ -64,30 +64,31 @@ export function useSpillPredictor(): SpillState {
     setError(null)
     setResult(null)
 
-    const edgeUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/spill-predictor`
+    // Strip trailing slash from URL if present
+    const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/\/$/, '')
+    const edgeUrl = `${supabaseUrl}/functions/v1/spill-predictor`
 
     try {
-      const response = await fetch(edgeUrl, {
+      const res = await fetch(edgeUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''}`,
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
         },
         body: JSON.stringify(params)
       })
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null)
-        setError(errorData?.error || 'Prediction service unavailable')
-        setLoading(false)
-        return
+      if (!res.ok) {
+        const errText = await res.text()
+        throw new Error(`Spill predictor returned ${res.status}: ${errText}`)
       }
 
-      const data = await response.json()
-      setResult(data as SpillResult)
+      const data: SpillResult = await res.json()
+      setResult(data)
       setLoading(false)
     } catch (err) {
-      setError('Prediction service unavailable')
+      setError(err instanceof Error ? err.message : 'Prediction service unavailable')
       setLoading(false)
       setResult(null)
     }

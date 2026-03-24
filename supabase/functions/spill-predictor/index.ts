@@ -5,6 +5,12 @@ const supabase = createClient(
   Deno.env.get('MY_SERVICE_ROLE_KEY')!
 )
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
 interface CurrentPoint {
   lat: number
   lon: number
@@ -173,6 +179,9 @@ function haversineKm(
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
   try {
     // ── Parse request ──
     const body = await req.json() as SpillRequest
@@ -181,7 +190,7 @@ Deno.serve(async (req: Request) => {
     if (!lat || !lon || isNaN(lat) || isNaN(lon)) {
       return new Response(
         JSON.stringify({ error: 'lat and lon are required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -193,7 +202,7 @@ Deno.serve(async (req: Request) => {
     if (tileError || !tileData) {
       return new Response(
         JSON.stringify({ error: 'Ocean current data not available', detail: tileError?.message }),
-        { status: 503, headers: { 'Content-Type': 'application/json' } }
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -306,14 +315,14 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(JSON.stringify(response), {
-      headers: { 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
   } catch (err) {
     console.error('spill-predictor failed:', err)
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })

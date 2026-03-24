@@ -459,20 +459,20 @@ export default function GlobeViewComponent() {
                 />
             )}
             {selectedVessel && (
-                <div className="absolute right-4 top-20 w-96 max-w-[calc(100vw-32px)] flex flex-col pointer-events-none z-10">
-                    <div className="pointer-events-auto w-full">
-                        <VesselPanel
-                            vessel={selectedVessel}
-                            onClose={() => { setSelectedVessel(null); setSpillResult(null) }}
-                        />
-                        <SpillPanel
-                            vesselLat={selectedVessel.lat}
-                            vesselLon={selectedVessel.lon}
-                            mmsi={selectedVessel.mmsi}
-                            vesselType={selectedVessel.type_category ?? null}
-                            onSpillResult={setSpillResult}
-                        />
-                    </div>
+                <VesselPanel
+                    vessel={selectedVessel}
+                    onClose={() => { setSelectedVessel(null); setSpillResult(null) }}
+                />
+            )}
+            {selectedVessel && (
+                <div className="absolute right-4 top-20 w-96 max-w-[calc(100vw-32px)] pointer-events-auto z-10 mt-[420px]">
+                    <SpillPanel
+                        vesselLat={selectedVessel.lat}
+                        vesselLon={selectedVessel.lon}
+                        mmsi={selectedVessel.mmsi}
+                        vesselType={selectedVessel.type_category ?? null}
+                        onSpillResult={setSpillResult}
+                    />
                 </div>
             )}
 

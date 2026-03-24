@@ -41,7 +41,7 @@ export default function SpillPanel({
   }
 
   return (
-    <div className="glass-panel mt-2 p-4 bg-navy-950/95">
+    <div className="glass-panel p-4 bg-navy-950/95 w-full flex-shrink-0">
       {/* Header Row */}
       <div className="flex items-center justify-between mb-4">
         <span className="text-orange-400 font-heading text-xs uppercase tracking-widest font-semibold">
