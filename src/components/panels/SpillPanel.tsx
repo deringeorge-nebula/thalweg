@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import useSpillPredictor, { SpillResult } from '../../hooks/useSpillPredictor'
+import { generateSpillReport } from '@/lib/spillReport'
 
 export interface SpillPanelProps {
   vesselLat: number
@@ -48,12 +49,20 @@ export default function SpillPanel({
           SPILL DRIFT PREDICTION
         </span>
         {result ? (
-          <button 
-            onClick={handleClear}
-            className="text-gray-400 hover:text-white text-xs font-data transition-colors"
-          >
-            Clear
-          </button>
+          <div className="flex gap-2 items-center">
+            <button
+              onClick={() => generateSpillReport(result, null)}
+              className="text-xs text-accent-cyan hover:text-white font-data border border-accent-cyan/30 hover:border-accent-cyan px-2 py-0.5 rounded transition-colors"
+            >
+              &#8595; PDF
+            </button>
+            <button
+              onClick={() => { clearResult(); onSpillResult(null) }}
+              className="text-xs text-gray-400 hover:text-white font-data transition-colors"
+            >
+              Clear
+            </button>
+          </div>
         ) : (
           <span className="text-gray-500 text-xs font-body">?</span>
         )}
