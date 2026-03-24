@@ -278,4 +278,5 @@ For maritime emergencies contact MRCC or USCG NRC: **+1 800 424 8802**
 
 ## License
 
-MIT — free to use, modify, and deploy.
+AGPL-3.0 — free to use and modify. Any deployment must also be open source.
+See [LICENSE](./LICENSE) for full terms.
