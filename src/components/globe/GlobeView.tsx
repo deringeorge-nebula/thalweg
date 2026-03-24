@@ -9,8 +9,10 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import DeckGL from '@deck.gl/react';
 import { _GlobeView as GlobeView } from '@deck.gl/core';
-import { ScatterplotLayer, GeoJsonLayer, GridCellLayer } from '@deck.gl/layers';
+import { ScatterplotLayer, GeoJsonLayer, GridCellLayer, PolygonLayer } from '@deck.gl/layers';
 import usePiracyData, { PiracyIncident } from '@/hooks/usePiracyData';
+import { SpillResult } from '@/hooks/useSpillPredictor';
+import SpillPanel from '../panels/SpillPanel';
 import PiracyPanel from '../panels/PiracyPanel';
 import { useVesselStream } from '@/hooks/useVesselStream';
 import { hexToRgb, type VesselRow, type GlobeData, NAV_STATUS_LABELS } from '@/types/vessel';
@@ -73,6 +75,7 @@ export default function GlobeViewComponent() {
     const [darkFleetVisible, setDarkFleetVisible] = useState(true);
     const [showPiracy, setShowPiracy] = useState(true);
     const [selectedPiracy, setSelectedPiracy] = useState<PiracyIncident | null>(null);
+    const [spillResult, setSpillResult] = useState<SpillResult | null>(null);
     const { incidents: piracyIncidents, riskZones } = usePiracyData();
 
     const darkFleetVessels = useMemo(
@@ -239,6 +242,40 @@ export default function GlobeViewComponent() {
           },
           updateTriggers: { getFillColor: [], getRadius: [] }
         })] : []),
+
+        // Spill prediction polygon layers
+        ...(spillResult ? [
+          new PolygonLayer({
+            id: 'spill-h72',
+            data: [spillResult.footprints.h72],
+            getPolygon: (d: any) => d.coordinates[0],
+            getFillColor: [220, 38, 38, 40],
+            getLineColor: [220, 38, 38, 180],
+            lineWidthMinPixels: 1,
+            filled: true,
+            stroked: true,
+          }),
+          new PolygonLayer({
+            id: 'spill-h48',
+            data: [spillResult.footprints.h48],
+            getPolygon: (d: any) => d.coordinates[0],
+            getFillColor: [251, 146, 60, 55],
+            getLineColor: [251, 146, 60, 200],
+            lineWidthMinPixels: 1,
+            filled: true,
+            stroked: true,
+          }),
+          new PolygonLayer({
+            id: 'spill-h24',
+            data: [spillResult.footprints.h24],
+            getPolygon: (d: any) => d.coordinates[0],
+            getFillColor: [250, 204, 21, 70],
+            getLineColor: [250, 204, 21, 220],
+            lineWidthMinPixels: 2,
+            filled: true,
+            stroked: true,
+          }),
+        ] : []),
 
         new ScatterplotLayer({
             id: 'vessels',
@@ -422,10 +459,21 @@ export default function GlobeViewComponent() {
                 />
             )}
             {selectedVessel && (
-                <VesselPanel
-                    vessel={selectedVessel}
-                    onClose={() => setSelectedVessel(null)}
-                />
+                <div className="absolute right-4 top-20 w-96 max-w-[calc(100vw-32px)] flex flex-col pointer-events-none z-10">
+                    <div className="pointer-events-auto w-full">
+                        <VesselPanel
+                            vessel={selectedVessel}
+                            onClose={() => { setSelectedVessel(null); setSpillResult(null) }}
+                        />
+                        <SpillPanel
+                            vesselLat={selectedVessel.lat}
+                            vesselLon={selectedVessel.lon}
+                            mmsi={selectedVessel.mmsi}
+                            vesselType={selectedVessel.type_category ?? null}
+                            onSpillResult={setSpillResult}
+                        />
+                    </div>
+                </div>
             )}
 
             {selectedPort && (
