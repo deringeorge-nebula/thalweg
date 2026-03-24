@@ -76,7 +76,7 @@ let pendingPositions: Record<string, unknown>[] = [];
 let batchFlushTimer: number | null = null;
 
 const MAX_CACHE_SIZE = 50_000;
-const POSITION_WRITE_INTERVAL_MS = 5 * 60 * 1000; // 5 min per vessel
+const POSITION_WRITE_INTERVAL_MS = 15 * 60 * 1000; // 15 min per vessel
 const BATCH_INTERVAL_MS = 2_000; // flush every 2 seconds
 const DEDUP_DISTANCE_DEG = 0.001; // ~100m
 const DEDUP_TIME_MS = 30_000; // 30 seconds
