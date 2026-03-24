@@ -68,6 +68,8 @@ const vesselCache = new Map<string, {
     lat: number; lon: number; timestamp: number; lastPositionWrite: number;
 }>();
 
+const lastPositionWrite = new Map<string, number>();
+
 // FIX 2: Separate queues to solve the Foreign Key Violation
 const pendingVessels = new Map<string, Record<string, unknown>>();
 let pendingPositions: Record<string, unknown>[] = [];
@@ -242,8 +244,8 @@ async function processMessage(parsed: NonNullable<ReturnType<typeof parseAndVali
     }
 
     // ── Update in-memory cache ───────────────────────────────────────────────────
-    const lastPositionWrite = cached?.lastPositionWrite ?? 0;
-    vesselCache.set(mmsi, { lat, lon, timestamp, lastPositionWrite });
+    const localLastPosWrite = cached?.lastPositionWrite ?? 0;
+    vesselCache.set(mmsi, { lat, lon, timestamp, lastPositionWrite: localLastPosWrite });
 
     const classification = classifyVessel(parsed.shipType);
 
@@ -257,8 +259,9 @@ async function processMessage(parsed: NonNullable<ReturnType<typeof parseAndVali
 
     // ── Queue position history ────────────────────────────────────────────────────
     const now = Date.now();
-    if (now - lastPositionWrite >= POSITION_WRITE_INTERVAL_MS) {
-        vesselCache.set(mmsi, { lat, lon, timestamp, lastPositionWrite: now });
+    const lastWrite = lastPositionWrite.get(mmsi) ?? 0;
+    if (now - lastWrite >= POSITION_WRITE_INTERVAL_MS) {
+        lastPositionWrite.set(mmsi, now);
         pendingPositions.push({
             mmsi, lat, lon, sog, cog, nav_status: navStatus, recorded_at: new Date().toISOString(),
         });
