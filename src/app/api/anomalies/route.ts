@@ -1,7 +1,17 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { standardRatelimit, getClientIp } from '@/lib/ratelimit'
 
 export async function GET(request: Request) {
+  const ip = getClientIp(request)
+  const { success } = await standardRatelimit.limit(ip)
+  if (!success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Please try again in a minute.' },
+      { status: 429 }
+    )
+  }
+
   const { searchParams } = new URL(request.url)
   
   // Extract parameters

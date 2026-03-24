@@ -1,10 +1,20 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { standardRatelimit, getClientIp } from '@/lib/ratelimit'
 
 export async function GET(
   request: Request,
   { params }: { params: { mmsi: string } }
 ) {
+  const ip = getClientIp(request)
+  const { success } = await standardRatelimit.limit(ip)
+  if (!success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Please try again in a minute.' },
+      { status: 429 }
+    )
+  }
+
   const mmsi = params.mmsi
 
   // Validation: Exactly 9 digits

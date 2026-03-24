@@ -1,41 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-const RATE_LIMIT_WINDOW_MS = 60_000
-const RATE_LIMIT_MAX = 10
-const ipRequestCounts = new Map<string, { count: number; resetAt: number }>()
-
-function getRateLimitResult(ip: string): { allowed: boolean; remaining: number } {
-  const now = Date.now()
-  const record = ipRequestCounts.get(ip)
-
-  if (!record || now > record.resetAt) {
-    ipRequestCounts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
-    return { allowed: true, remaining: RATE_LIMIT_MAX - 1 }
-  }
-
-  if (record.count >= RATE_LIMIT_MAX) {
-    return { allowed: false, remaining: 0 }
-  }
-
-  record.count++
-  return { allowed: true, remaining: RATE_LIMIT_MAX - record.count }
-}
+import { spillRatelimit, getClientIp } from '@/lib/ratelimit'
 
 export async function POST(request: NextRequest) {
   // Rate limiting
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-    ?? request.headers.get('x-real-ip')
-    ?? 'unknown'
+  const ip = getClientIp(request)
+  const { success, remaining, limit } = await spillRatelimit.limit(ip)
 
-  const { allowed, remaining } = getRateLimitResult(ip)
-
-  if (!allowed) {
+  if (!success) {
     return NextResponse.json(
       { error: 'Rate limit exceeded. Maximum 10 spill predictions per minute.' },
       {
         status: 429,
         headers: {
-          'X-RateLimit-Limit': String(RATE_LIMIT_MAX),
+          'X-RateLimit-Limit': String(limit),
           'X-RateLimit-Remaining': '0',
           'Retry-After': '60',
         }
@@ -104,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data, {
       headers: {
-        'X-RateLimit-Limit': String(RATE_LIMIT_MAX),
+        'X-RateLimit-Limit': String(limit),
         'X-RateLimit-Remaining': String(remaining),
         'Cache-Control': 'no-store',
       }
