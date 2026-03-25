@@ -6,6 +6,7 @@ import { generateVesselBrief } from '@/lib/intelligenceBrief';
 import { X, Ship, AlertTriangle, AlertCircle, Navigation, Sparkles, Loader2 } from 'lucide-react';
 import type { VesselRow } from '@/types/vessel';
 import { NAV_STATUS_LABELS } from '@/types/vessel';
+import WatchPanel from '@/components/panels/WatchPanel';
 
 interface Props {
     vessel: VesselRow;
@@ -186,6 +187,11 @@ export default function VesselPanel({ vessel, onClose }: Props) {
                         </div>
                     )}
                 </div>
+
+                <WatchPanel
+                    mmsi={vessel.mmsi}
+                    vesselName={vessel.vessel_name ?? null}
+                />
             </div>
         </div>
     );

@@ -57,7 +57,7 @@ export default function SpillPanel({
               &#8595; PDF
             </button>
             <button
-              onClick={() => { clearResult(); onSpillResult(null) }}
+              onClick={handleClear}
               className="text-xs text-gray-400 hover:text-white font-data transition-colors"
             >
               Clear
