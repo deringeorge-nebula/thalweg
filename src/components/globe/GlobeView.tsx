@@ -17,6 +17,7 @@ import SpillPanel from '../panels/SpillPanel';
 import PiracyPanel from '../panels/PiracyPanel';
 import { useVesselStream } from '@/hooks/useVesselStream';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { VesselSearchBar } from './VesselSearchBar';
 import { hexToRgb, type VesselRow, type GlobeData, NAV_STATUS_LABELS } from '@/types/vessel';
 import VesselPanel from './VesselPanel';
 import { usePortCongestion } from '@/hooks/usePortCongestion';
@@ -438,6 +439,22 @@ export default function GlobeViewComponent() {
                     <span className="text-text-muted text-xs font-data">
                         MARITIME INTELLIGENCE
                     </span>
+                </div>
+
+                <div className="relative">
+                    <VesselSearchBar
+                        vessels={globeData.vessels}
+                        onVesselSelect={(vessel) => {
+                            setSelectedVessel(vessel)
+                            trackVesselClick(
+                                vessel.mmsi,
+                                vessel.vessel_name ?? 'Unknown',
+                                vessel.is_anomaly ?? false,
+                                vessel.sanctions_match ?? false,
+                                vessel.dark_fleet_score ?? 0
+                            )
+                        }}
+                    />
                 </div>
 
                 <div className="flex items-center gap-4 text-xs font-data">
