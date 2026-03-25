@@ -7,6 +7,7 @@ import { X, Ship, AlertTriangle, AlertCircle, Navigation, Sparkles, Loader2 } fr
 import type { VesselRow } from '@/types/vessel';
 import { NAV_STATUS_LABELS } from '@/types/vessel';
 import WatchPanel from '@/components/panels/WatchPanel';
+import { trackIntelBrief } from '@/lib/analytics';
 
 interface Props {
     vessel: VesselRow;
@@ -28,6 +29,7 @@ export default function VesselPanel({ vessel, onClose }: Props) {
         setBriefLoading(true);
         setBriefError(null);
         setBrief(null);
+        trackIntelBrief(vessel.mmsi, vessel.vessel_name ?? 'Unknown');
         try {
             const result = await generateVesselBrief(vessel.mmsi);
             setBrief(result.brief);

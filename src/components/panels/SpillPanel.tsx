@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import useSpillPredictor, { SpillResult } from '../../hooks/useSpillPredictor'
 import { generateSpillReport } from '@/lib/spillReport'
+import { trackSpillPrediction, trackPdfExport } from '@/lib/analytics'
 
 export interface SpillPanelProps {
   vesselLat: number
@@ -17,14 +18,16 @@ export default function SpillPanel({
   vesselType,
   onSpillResult
 }: SpillPanelProps) {
+  // vesselName is not a prop in SpillPanel — use mmsi as identifier for analytics
   const { loading, result, error, runPrediction, clearResult } = useSpillPredictor()
   const [tonnes, setTonnes] = useState<number>(1000)
 
   useEffect(() => {
     if (result) {
       onSpillResult(result)
+      trackSpillPrediction(mmsi, mmsi, result.vessel_type ?? 'UNKNOWN')
     }
-  }, [result, onSpillResult])
+  }, [result, onSpillResult, mmsi])
 
   const handleRun = () => {
     runPrediction({
@@ -51,7 +54,10 @@ export default function SpillPanel({
         {result ? (
           <div className="flex gap-2 items-center">
             <button
-              onClick={() => generateSpillReport(result, null)}
+              onClick={() => {
+                trackPdfExport(mmsi, result?.vessel_type ?? 'UNKNOWN')
+                generateSpillReport(result, null)
+              }}
               className="text-xs text-accent-cyan hover:text-white font-data border border-accent-cyan/30 hover:border-accent-cyan px-2 py-0.5 rounded transition-colors"
             >
               &#8595; PDF

@@ -20,6 +20,7 @@ import VesselPanel from './VesselPanel';
 import { usePortCongestion } from '@/hooks/usePortCongestion';
 import type { PortWithCongestion } from '@/hooks/usePortCongestion';
 import PortPanel from './PortPanel';
+import { trackVesselClick } from '@/lib/analytics';
 
 // Natural Earth 110m land polygons — public domain, no API key required
 const LAND_DATA_URL =
@@ -167,7 +168,16 @@ export default function GlobeViewComponent() {
             lineWidthMinPixels: 2,
             pickable: true,
             onClick: ({ object }: { object: any }) => {
-                if (object) setSelectedVessel(object);
+                if (object) {
+                    setSelectedVessel(object);
+                    trackVesselClick(
+                        object.mmsi,
+                        object.vessel_name ?? 'Unknown',
+                        object.is_anomaly ?? false,
+                        object.sanctions_match ?? false,
+                        object.dark_fleet_score ?? 0
+                    );
+                }
             },
             updateTriggers: {
                 getFillColor: darkFleetVessels.length,
@@ -304,7 +314,15 @@ export default function GlobeViewComponent() {
             },
             onClick: ({ index }: any) => {
                 if (index >= 0 && index < globeData.vessels.length) {
-                    setSelectedVessel(globeData.vessels[index]);
+                    const v = globeData.vessels[index];
+                    setSelectedVessel(v);
+                    trackVesselClick(
+                        v.mmsi,
+                        v.vessel_name ?? 'Unknown',
+                        v.is_anomaly ?? false,
+                        v.sanctions_match ?? false,
+                        v.dark_fleet_score ?? 0
+                    );
                 }
             },
         }),

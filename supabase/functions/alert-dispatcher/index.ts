@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'Thalweg Alerts <alerts@thalweg.vercel.app>',
+          from: 'Thalweg Alerts <onboarding@resend.dev>',
           to: [watch.email],
           subject: `⚠ ${alertType}: ${vesselName} — THALWEG ALERT`,
           html: emailHtml,
@@ -159,11 +159,17 @@ Deno.serve(async (req) => {
 
       if (resendRes.ok) {
         // Update last_alerted_at and increment alert_count
+        const { data: currentWatch } = await supabase
+          .from('watched_vessels')
+          .select('alert_count')
+          .eq('id', watch.id)
+          .single()
+
         await supabase
           .from('watched_vessels')
           .update({
             last_alerted_at: now.toISOString(),
-            alert_count: supabase.rpc('increment', { row_id: watch.id })
+            alert_count: (currentWatch?.alert_count ?? 0) + 1
           })
           .eq('id', watch.id)
 

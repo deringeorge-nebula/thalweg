@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { trackWatchSubscription } from '@/lib/analytics'
 
 interface WatchPanelProps {
   mmsi: string
@@ -32,6 +33,7 @@ export default function WatchPanel({ mmsi, vesselName }: WatchPanelProps) {
         setState('error')
         return
       }
+      trackWatchSubscription(mmsi, vesselName ?? 'Unknown')
       setState('success')
     } catch {
       setErrorMsg('Network error')
