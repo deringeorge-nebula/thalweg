@@ -9,9 +9,11 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import DeckGL from '@deck.gl/react';
 import { _GlobeView as GlobeView } from '@deck.gl/core';
-import { ScatterplotLayer, GeoJsonLayer, GridCellLayer, PolygonLayer } from '@deck.gl/layers';
+import { ScatterplotLayer, GeoJsonLayer, GridCellLayer, PolygonLayer, LineLayer } from '@deck.gl/layers';
 import { GridLayer } from '@deck.gl/aggregation-layers';
 import usePiracyData, { PiracyIncident } from '@/hooks/usePiracyData';
+import { useRouteRisk } from '@/hooks/useRouteRisk';
+import { RouteRiskPanel } from '../panels/RouteRiskPanel';
 import { SpillResult } from '@/hooks/useSpillPredictor';
 import SpillPanel from '../panels/SpillPanel';
 import PiracyPanel from '../panels/PiracyPanel';
@@ -30,23 +32,23 @@ const LAND_DATA_URL =
     'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_110m_land.geojson';
 
 function congestionColor(index: number): [number, number, number, number] {
-    if (index <= 25)  return [0,   255, 136, 220];  // green  — NORMAL
-    if (index <= 50)  return [255, 200, 0,   230];  // yellow — ELEVATED
-    if (index <= 75)  return [255, 140, 0,   240];  // orange — CONGESTED
-    return              [255, 68,  68,  255];        // red    — SEVERE
+    if (index <= 25) return [0, 255, 136, 220];  // green  — NORMAL
+    if (index <= 50) return [255, 200, 0, 230];  // yellow — ELEVATED
+    if (index <= 75) return [255, 140, 0, 240];  // orange — CONGESTED
+    return [255, 68, 68, 255];        // red    — SEVERE
 }
 
 // Maps SST value (°C) to RGBA colour
 // Cold: deep blue (-2°C) → Cool: cyan (10°C) → Warm: yellow (22°C) → Hot: red (32°C)
 function sstColor(sst: number): [number, number, number, number] {
-    if (sst <= -2)  return [0,   0,   139, 180];
-    if (sst <= 5)   return [0,   105, 200, 170];
-    if (sst <= 10)  return [0,   200, 220, 160];
-    if (sst <= 15)  return [0,   230, 180, 150];
-    if (sst <= 20)  return [80,  220, 100, 140];
-    if (sst <= 25)  return [255, 200, 0,   140];
-    if (sst <= 29)  return [255, 120, 0,   150];
-    return                 [220, 30,  30,  160];
+    if (sst <= -2) return [0, 0, 139, 180];
+    if (sst <= 5) return [0, 105, 200, 170];
+    if (sst <= 10) return [0, 200, 220, 160];
+    if (sst <= 15) return [0, 230, 180, 150];
+    if (sst <= 20) return [80, 220, 100, 140];
+    if (sst <= 25) return [255, 200, 0, 140];
+    if (sst <= 29) return [255, 120, 0, 150];
+    return [220, 30, 30, 160];
 }
 
 const INITIAL_VIEW_STATE = {
@@ -68,6 +70,11 @@ export default function GlobeViewComponent() {
 
     const [globeData, setGlobeData] = useState<GlobeData>(EMPTY_GLOBE_DATA);
     const { isDemoMode, demoVessels } = useDemoMode(globeData.count);
+    const {
+        isRouteMode, setIsRouteMode,
+        waypoints, addWaypoint,
+        clearRoute, threats, isAnalyzing, threatCount
+    } = useRouteRisk();
     const [selectedVessel, setSelectedVessel] = useState<VesselRow | null>(null);
     const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; vessel: VesselRow } | null>(null);
     const { ports } = usePortCongestion();
@@ -145,27 +152,27 @@ export default function GlobeViewComponent() {
         const count = demoVessels.length;
         const positions = new Float32Array(count * 2);
         const colors = new Uint8Array(count * 4);
-        
+
         for (let i = 0; i < count; i++) {
             const v = demoVessels[i];
             positions[i * 2] = v.lon ?? 0;
             positions[i * 2 + 1] = v.lat ?? 0;
-            
+
             const r = v.sanctions_match ? 255 : v.is_anomaly ? 255 : 52;
-            const g = v.sanctions_match ? 68  : v.is_anomaly ? 184 : 152;
-            const b = v.sanctions_match ? 68  : v.is_anomaly ? 0   : 219;
-            
-            colors[i * 4]     = r;
+            const g = v.sanctions_match ? 68 : v.is_anomaly ? 184 : 152;
+            const b = v.sanctions_match ? 68 : v.is_anomaly ? 0 : 219;
+
+            colors[i * 4] = r;
             colors[i * 4 + 1] = g;
             colors[i * 4 + 2] = b;
             colors[i * 4 + 3] = v.is_anomaly || v.sanctions_match ? 255 : 210;
         }
-        
-        setGlobeData({ 
-            positions, 
-            colors, 
-            vessels: demoVessels as any, 
-            count 
+
+        setGlobeData({
+            positions,
+            colors,
+            vessels: demoVessels as any,
+            count
         });
     }, [isDemoMode, demoVessels]);
 
@@ -182,11 +189,11 @@ export default function GlobeViewComponent() {
         pickable: false,
         opacity: 0.8,
         colorRange: [
-            [0,   30,  80,  160],   // very sparse  — dark navy
-            [0,   70,  120, 180],   // sparse       — dark blue
-            [0,   120, 160, 200],   // moderate     — blue
-            [0,   170, 200, 220],   // medium       — teal
-            [0,   212, 255, 235],   // dense        — accent cyan
+            [0, 30, 80, 160],   // very sparse  — dark navy
+            [0, 70, 120, 180],   // sparse       — dark blue
+            [0, 120, 160, 200],   // moderate     — blue
+            [0, 170, 200, 220],   // medium       — teal
+            [0, 212, 255, 235],   // dense        — accent cyan
             [255, 255, 255, 255],   // very dense   — white
         ] as [number, number, number, number][],
         elevationScale: 0,
@@ -202,201 +209,234 @@ export default function GlobeViewComponent() {
         },
     })
 
+    // ── Route layers ───────────────────────────────────────────────────────────
+    const routeLineLayer = waypoints.length === 2
+        ? new LineLayer({
+            id: 'route-line',
+            data: [{
+                source: [waypoints[0].lon, waypoints[0].lat],
+                target: [waypoints[1].lon, waypoints[1].lat]
+            }],
+            getSourcePosition: (d: any) => d.source,
+            getTargetPosition: (d: any) => d.target,
+            getColor: [0, 212, 255, 200],
+            getWidth: 2,
+            widthMinPixels: 2,
+        })
+        : null
+
+    const waypointLayer = waypoints.length > 0
+        ? new ScatterplotLayer({
+            id: 'route-waypoints',
+            data: waypoints,
+            getPosition: (d: any) => [d.lon, d.lat],
+            getFillColor: [0, 212, 255, 255],
+            getLineColor: [255, 255, 255, 200],
+            getRadius: 40000,
+            radiusMinPixels: 8,
+            stroked: true,
+            lineWidthMinPixels: 2,
+            pickable: false,
+        })
+        : null
+
     // ── deck.gl layers ─────────────────────────────────────────────────────────
     const layers = showHeatmap
-        ? [heatmapLayer]
+        ? [heatmapLayer, routeLineLayer, waypointLayer].filter(Boolean)
         : [
-        new GridCellLayer({
-            id: 'sst',
-            data: sstData,
-            visible: sstVisible,
-            getPosition: (d: { lat: number; lon: number; sst: number }) => [d.lon, d.lat],
-            getFillColor: (d: { lat: number; lon: number; sst: number }) => sstColor(d.sst),
-            cellSize: 110000,     // ~1 degree in meters — matches ERDDAP grid stride
-            elevationScale: 0,    // flat — no 3D extrusion on globe
-            extruded: false,
-            pickable: false,      // SST layer is not interactive — vessels/ports take priority
-            opacity: 0.55,
-        }),
+            new GridCellLayer({
+                id: 'sst',
+                data: sstData,
+                visible: sstVisible,
+                getPosition: (d: { lat: number; lon: number; sst: number }) => [d.lon, d.lat],
+                getFillColor: (d: { lat: number; lon: number; sst: number }) => sstColor(d.sst),
+                cellSize: 110000,     // ~1 degree in meters — matches ERDDAP grid stride
+                elevationScale: 0,    // flat — no 3D extrusion on globe
+                extruded: false,
+                pickable: false,      // SST layer is not interactive — vessels/ports take priority
+                opacity: 0.55,
+            }),
 
-        new ScatterplotLayer({
-            id: 'dark-fleet',
-            data: darkFleetVessels,
-            visible: darkFleetVisible,
-            getPosition: (d: any) => [d.lon, d.lat],
-            getFillColor: (d: any) => {
-                const s = d.darkFleetScore ?? d.dark_fleet_score ?? 0;
-                if (s >= 80) return [255, 30,  30,  255]; // EXTREME — bright red
-                if (s >= 70) return [255, 100, 0,   255]; // HIGH    — orange-red
-                return              [255, 165, 0,   240]; // MEDIUM  — orange
-            },
-            getLineColor: [255, 255, 255, 200],
-            getRadius: 25000,
-            radiusMinPixels: 6,
-            radiusMaxPixels: 20,
-            stroked: true,
-            lineWidthMinPixels: 2,
-            pickable: true,
-            onClick: ({ object }: { object: any }) => {
-                if (object) {
-                    setSelectedVessel(object);
-                    trackVesselClick(
-                        object.mmsi,
-                        object.vessel_name ?? 'Unknown',
-                        object.is_anomaly ?? false,
-                        object.sanctions_match ?? false,
-                        object.dark_fleet_score ?? 0
-                    );
-                }
-            },
-            updateTriggers: {
-                getFillColor: darkFleetVessels.length,
-            },
-        }),
-
-        new ScatterplotLayer({
-            id: 'ports',
-            data: ports,
-            getPosition: (d: PortWithCongestion) => [d.lon, d.lat],
-            getFillColor: (d: PortWithCongestion) => congestionColor(d.congestion_index),
-            getLineColor: [255, 255, 255, 180],
-            getRadius: 35000,
-            radiusMinPixels: 5,
-            radiusMaxPixels: 18,
-            stroked: true,
-            lineWidthMinPixels: 1.5,
-            pickable: true,
-            onClick: ({ object }: { object: PortWithCongestion }) => {
-                if (object) {
-                    setSelectedVessel(null);
-                    setSelectedPort(object);
-                }
-            },
-        }),
-
-        new GeoJsonLayer({
-            id: 'land',
-            data: LAND_DATA_URL,
-            filled: true,
-            stroked: true,
-            getFillColor: [15, 28, 50, 255],    // dark blue-grey land
-            getLineColor: [0, 212, 255, 40],    // faint cyan coastlines
-            lineWidthMinPixels: 0.5,
-        }),
-
-        // Piracy Risk Zones
-        ...(showPiracy ? [new ScatterplotLayer({
-            id: 'piracy-zones',
-            data: riskZones,
-            getPosition: (d: any) => [d.center_lon, d.center_lat],
-            getRadius: (d: any) => d.radius_nm * 1852, // nm to meters
-            getFillColor: (d: any) => d.risk_level === 'CRITICAL' ? [255, 68, 68, 30] : [255, 140, 0, 30],
-            getLineColor: (d: any) => d.risk_level === 'CRITICAL' ? [255, 68, 68, 150] : [255, 140, 0, 150],
-            lineWidthMinPixels: 1,
-            stroked: true,
-            pickable: false,
-        })] : []),
-
-        // Piracy Incidents ScatterplotLayer
-        ...(showPiracy ? [new ScatterplotLayer({
-          id: 'piracy-incidents',
-          data: piracyIncidents,
-          getPosition: (d: PiracyIncident) => [d.lon, d.lat],
-          getRadius: (d: PiracyIncident) => d.attack_type === 'HIJACKED' ? 45000 : d.attack_type === 'FIRED_UPON' ? 35000 : 25000,
-          getFillColor: (d: PiracyIncident) => {
-            switch (d.attack_type) {
-              case 'HIJACKED':    return [255, 68, 68, 220]   // alert-critical red
-              case 'FIRED_UPON':  return [255, 140, 0, 200]   // alert-warning orange
-              case 'BOARDED':     return [255, 200, 0, 180]   // yellow
-              default:            return [100, 180, 255, 160]  // blue for approached/suspicious
-            }
-          },
-          radiusMinPixels: 4,
-          radiusMaxPixels: 18,
-          stroked: true,
-          getLineColor: [255, 255, 255, 120],
-          lineWidthMinPixels: 1,
-          pickable: true,
-          onClick: ({ object }: { object: any }) => {
-            if (object) setSelectedPiracy(object as PiracyIncident)
-          },
-          updateTriggers: { getFillColor: [], getRadius: [] }
-        })] : []),
-
-        // Spill prediction polygon layers
-        ...(spillResult ? [
-          new PolygonLayer({
-            id: 'spill-h72',
-            data: [spillResult.footprints.h72],
-            getPolygon: (d: any) => d.coordinates[0],
-            getFillColor: [220, 38, 38, 40],
-            getLineColor: [220, 38, 38, 180],
-            lineWidthMinPixels: 1,
-            filled: true,
-            stroked: true,
-          }),
-          new PolygonLayer({
-            id: 'spill-h48',
-            data: [spillResult.footprints.h48],
-            getPolygon: (d: any) => d.coordinates[0],
-            getFillColor: [251, 146, 60, 55],
-            getLineColor: [251, 146, 60, 200],
-            lineWidthMinPixels: 1,
-            filled: true,
-            stroked: true,
-          }),
-          new PolygonLayer({
-            id: 'spill-h24',
-            data: [spillResult.footprints.h24],
-            getPolygon: (d: any) => d.coordinates[0],
-            getFillColor: [250, 204, 21, 70],
-            getLineColor: [250, 204, 21, 220],
-            lineWidthMinPixels: 2,
-            filled: true,
-            stroked: true,
-          }),
-        ] : []),
-
-        new ScatterplotLayer({
-            id: 'vessels',
-            data: {
-                length: globeData.count,
-                attributes: {
-                    getPosition: { value: globeData.positions, size: 2 },
-                    getFillColor: { value: globeData.colors, size: 4, normalized: true },
+            new ScatterplotLayer({
+                id: 'dark-fleet',
+                data: darkFleetVessels,
+                visible: darkFleetVisible,
+                getPosition: (d: any) => [d.lon, d.lat],
+                getFillColor: (d: any) => {
+                    const s = d.darkFleetScore ?? d.dark_fleet_score ?? 0;
+                    if (s >= 80) return [255, 30, 30, 255]; // EXTREME — bright red
+                    if (s >= 70) return [255, 100, 0, 255]; // HIGH    — orange-red
+                    return [255, 165, 0, 240]; // MEDIUM  — orange
                 },
-            },
-            getRadius: 5000,           // 5km — visible at global zoom
-            radiusMinPixels: 1.5,
-            radiusMaxPixels: 10,
-            pickable: true,
-            opacity: 0.9,
-            updateTriggers: {
-                getPosition: globeData.count,
-                getFillColor: globeData.count,
-            },
-            onHover: ({ index, x, y }: any) => {
-                if (index >= 0 && index < globeData.vessels.length) {
-                    setHoverInfo({ x, y, vessel: globeData.vessels[index] });
-                } else {
-                    setHoverInfo(null);
-                }
-            },
-            onClick: ({ index }: any) => {
-                if (index >= 0 && index < globeData.vessels.length) {
-                    const v = globeData.vessels[index];
-                    setSelectedVessel(v);
-                    trackVesselClick(
-                        v.mmsi,
-                        v.vessel_name ?? 'Unknown',
-                        v.is_anomaly ?? false,
-                        v.sanctions_match ?? false,
-                        v.dark_fleet_score ?? 0
-                    );
-                }
-            },
-        }),
-    ];
+                getLineColor: [255, 255, 255, 200],
+                getRadius: 25000,
+                radiusMinPixels: 6,
+                radiusMaxPixels: 20,
+                stroked: true,
+                lineWidthMinPixels: 2,
+                pickable: true,
+                onClick: ({ object }: { object: any }) => {
+                    if (object) {
+                        setSelectedVessel(object);
+                        trackVesselClick(
+                            object.mmsi,
+                            object.vessel_name ?? 'Unknown',
+                            object.is_anomaly ?? false,
+                            object.sanctions_match ?? false,
+                            object.dark_fleet_score ?? 0
+                        );
+                    }
+                },
+                updateTriggers: {
+                    getFillColor: darkFleetVessels.length,
+                },
+            }),
+
+            new ScatterplotLayer({
+                id: 'ports',
+                data: ports,
+                getPosition: (d: PortWithCongestion) => [d.lon, d.lat],
+                getFillColor: (d: PortWithCongestion) => congestionColor(d.congestion_index),
+                getLineColor: [255, 255, 255, 180],
+                getRadius: 35000,
+                radiusMinPixels: 5,
+                radiusMaxPixels: 18,
+                stroked: true,
+                lineWidthMinPixels: 1.5,
+                pickable: true,
+                onClick: ({ object }: { object: PortWithCongestion }) => {
+                    if (object) {
+                        setSelectedVessel(null);
+                        setSelectedPort(object);
+                    }
+                },
+            }),
+
+            new GeoJsonLayer({
+                id: 'land',
+                data: LAND_DATA_URL,
+                filled: true,
+                stroked: true,
+                getFillColor: [15, 28, 50, 255],    // dark blue-grey land
+                getLineColor: [0, 212, 255, 40],    // faint cyan coastlines
+                lineWidthMinPixels: 0.5,
+            }),
+
+            // Piracy Risk Zones
+            ...(showPiracy ? [new ScatterplotLayer({
+                id: 'piracy-zones',
+                data: riskZones,
+                getPosition: (d: any) => [d.center_lon, d.center_lat],
+                getRadius: (d: any) => d.radius_nm * 1852, // nm to meters
+                getFillColor: (d: any) => d.risk_level === 'CRITICAL' ? [255, 68, 68, 30] : [255, 140, 0, 30],
+                getLineColor: (d: any) => d.risk_level === 'CRITICAL' ? [255, 68, 68, 150] : [255, 140, 0, 150],
+                lineWidthMinPixels: 1,
+                stroked: true,
+                pickable: false,
+            })] : []),
+
+            // Piracy Incidents ScatterplotLayer
+            ...(showPiracy ? [new ScatterplotLayer({
+                id: 'piracy-incidents',
+                data: piracyIncidents,
+                getPosition: (d: PiracyIncident) => [d.lon, d.lat],
+                getRadius: (d: PiracyIncident) => d.attack_type === 'HIJACKED' ? 45000 : d.attack_type === 'FIRED_UPON' ? 35000 : 25000,
+                getFillColor: (d: PiracyIncident) => {
+                    switch (d.attack_type) {
+                        case 'HIJACKED': return [255, 68, 68, 220]   // alert-critical red
+                        case 'FIRED_UPON': return [255, 140, 0, 200]   // alert-warning orange
+                        case 'BOARDED': return [255, 200, 0, 180]   // yellow
+                        default: return [100, 180, 255, 160]  // blue for approached/suspicious
+                    }
+                },
+                radiusMinPixels: 4,
+                radiusMaxPixels: 18,
+                stroked: true,
+                getLineColor: [255, 255, 255, 120],
+                lineWidthMinPixels: 1,
+                pickable: true,
+                onClick: ({ object }: { object: any }) => {
+                    if (object) setSelectedPiracy(object as PiracyIncident)
+                },
+                updateTriggers: { getFillColor: [], getRadius: [] }
+            })] : []),
+
+            // Spill prediction polygon layers
+            ...(spillResult ? [
+                new PolygonLayer({
+                    id: 'spill-h72',
+                    data: [spillResult.footprints.h72],
+                    getPolygon: (d: any) => d.coordinates[0],
+                    getFillColor: [220, 38, 38, 40],
+                    getLineColor: [220, 38, 38, 180],
+                    lineWidthMinPixels: 1,
+                    filled: true,
+                    stroked: true,
+                }),
+                new PolygonLayer({
+                    id: 'spill-h48',
+                    data: [spillResult.footprints.h48],
+                    getPolygon: (d: any) => d.coordinates[0],
+                    getFillColor: [251, 146, 60, 55],
+                    getLineColor: [251, 146, 60, 200],
+                    lineWidthMinPixels: 1,
+                    filled: true,
+                    stroked: true,
+                }),
+                new PolygonLayer({
+                    id: 'spill-h24',
+                    data: [spillResult.footprints.h24],
+                    getPolygon: (d: any) => d.coordinates[0],
+                    getFillColor: [250, 204, 21, 70],
+                    getLineColor: [250, 204, 21, 220],
+                    lineWidthMinPixels: 2,
+                    filled: true,
+                    stroked: true,
+                }),
+            ] : []),
+
+            new ScatterplotLayer({
+                id: 'vessels',
+                data: {
+                    length: globeData.count,
+                    attributes: {
+                        getPosition: { value: globeData.positions, size: 2 },
+                        getFillColor: { value: globeData.colors, size: 4, normalized: true },
+                    },
+                },
+                getRadius: 5000,           // 5km — visible at global zoom
+                radiusMinPixels: 1.5,
+                radiusMaxPixels: 10,
+                pickable: true,
+                opacity: 0.9,
+                updateTriggers: {
+                    getPosition: globeData.count,
+                    getFillColor: globeData.count,
+                },
+                onHover: ({ index, x, y }: any) => {
+                    if (index >= 0 && index < globeData.vessels.length) {
+                        setHoverInfo({ x, y, vessel: globeData.vessels[index] });
+                    } else {
+                        setHoverInfo(null);
+                    }
+                },
+                onClick: ({ index }: any) => {
+                    if (index >= 0 && index < globeData.vessels.length) {
+                        const v = globeData.vessels[index];
+                        setSelectedVessel(v);
+                        trackVesselClick(
+                            v.mmsi,
+                            v.vessel_name ?? 'Unknown',
+                            v.is_anomaly ?? false,
+                            v.sanctions_match ?? false,
+                            v.dark_fleet_score ?? 0
+                        );
+                    }
+                },
+            }),
+            ...(routeLineLayer ? [routeLineLayer] : []),
+            ...(waypointLayer ? [waypointLayer] : []),
+        ];
 
     return (
         <div className="relative w-full h-screen bg-ocean-base overflow-hidden">
@@ -409,6 +449,11 @@ export default function GlobeViewComponent() {
                 style={{ background: '#0A1628' }}
                 getCursor={({ isHovering }: any) => (isHovering ? 'crosshair' : 'grab')}
                 onError={(error: any) => console.error('[DeckGL]', error)}
+                onClick={({ coordinate }: any, event: any) => {
+                    if (isRouteMode && coordinate && event?.srcEvent?.shiftKey) {
+                        addWaypoint({ lat: coordinate[1], lon: coordinate[0] })
+                    }
+                }}
             />
 
             {/* ── Heatmap / Vessels toggle ──────────────────────────────────────── */}
@@ -496,33 +541,48 @@ export default function GlobeViewComponent() {
                     )}
 
                     <button
+                        onClick={() => setIsRouteMode(!isRouteMode)}
+                        className={`
+                            text-xs font-data px-2 py-0.5 rounded border transition-colors
+                            ${isRouteMode
+                                ? 'border-[#00d4ff] bg-[#00d4ff]/20 text-[#00d4ff]'
+                                : 'border-text-muted text-text-muted hover:border-[#00d4ff] hover:text-[#00d4ff]'
+                            }
+                        `}
+                    >
+                        {isRouteMode
+                            ? (waypoints.length === 0 ? '⇧ CLICK ORIGIN'
+                                : waypoints.length === 1 ? '⇧ CLICK DEST'
+                                    : `${threatCount} THREATS`)
+                            : 'ROUTE'
+                        }
+                    </button>
+
+                    <button
                         onClick={() => setSstVisible((v) => !v)}
-                        className={`text-xs font-data px-2 py-0.5 rounded border transition-colors ${
-                            sstVisible
-                                ? 'border-accent-cyan text-accent-cyan'
-                                : 'border-text-muted text-text-muted'
-                        }`}
+                        className={`text-xs font-data px-2 py-0.5 rounded border transition-colors ${sstVisible
+                            ? 'border-accent-cyan text-accent-cyan'
+                            : 'border-text-muted text-text-muted'
+                            }`}
                     >
                         SST
                     </button>
                     <button
                         onClick={() => setDarkFleetVisible((v) => !v)}
-                        className={`text-xs font-data px-2 py-0.5 rounded border transition-colors ${
-                            darkFleetVisible
-                                ? 'border-alert-critical text-alert-critical'
-                                : 'border-text-muted text-text-muted'
-                        }`}
+                        className={`text-xs font-data px-2 py-0.5 rounded border transition-colors ${darkFleetVisible
+                            ? 'border-alert-critical text-alert-critical'
+                            : 'border-text-muted text-text-muted'
+                            }`}
                     >
                         DARK FLEET
                     </button>
                     {/* PIRACY button */}
                     <button
                         onClick={() => setShowPiracy(p => !p)}
-                        className={`px-3 py-1 rounded text-xs font-data font-medium border transition-all ${
-                            showPiracy
-                                ? 'bg-red-900/40 border-red-500 text-red-400'
-                                : 'bg-navy-950/40 border-gray-600 text-gray-400 hover:border-gray-400'
-                        }`}
+                        className={`px-3 py-1 rounded text-xs font-data font-medium border transition-all ${showPiracy
+                            ? 'bg-red-900/40 border-red-500 text-red-400'
+                            : 'bg-navy-950/40 border-gray-600 text-gray-400 hover:border-gray-400'
+                            }`}
                     >
                         PIRACY
                     </button>
@@ -613,6 +673,13 @@ export default function GlobeViewComponent() {
                     onClose={() => setSelectedPort(null)}
                 />
             )}
+
+            <RouteRiskPanel
+                waypoints={waypoints}
+                threats={threats}
+                isAnalyzing={isAnalyzing}
+                onClear={clearRoute}
+            />
         </div>
     );
 }
