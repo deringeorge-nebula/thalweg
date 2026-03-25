@@ -16,6 +16,7 @@ import { SpillResult } from '@/hooks/useSpillPredictor';
 import SpillPanel from '../panels/SpillPanel';
 import PiracyPanel from '../panels/PiracyPanel';
 import { useVesselStream } from '@/hooks/useVesselStream';
+import { useDemoMode } from '@/hooks/useDemoMode';
 import { hexToRgb, type VesselRow, type GlobeData, NAV_STATUS_LABELS } from '@/types/vessel';
 import VesselPanel from './VesselPanel';
 import { usePortCongestion } from '@/hooks/usePortCongestion';
@@ -65,6 +66,7 @@ export default function GlobeViewComponent() {
         useVesselStream();
 
     const [globeData, setGlobeData] = useState<GlobeData>(EMPTY_GLOBE_DATA);
+    const { isDemoMode, demoVessels } = useDemoMode(globeData.count);
     const [selectedVessel, setSelectedVessel] = useState<VesselRow | null>(null);
     const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; vessel: VesselRow } | null>(null);
     const { ports } = usePortCongestion();
@@ -102,6 +104,7 @@ export default function GlobeViewComponent() {
     // triggers exactly ONE setState per 500ms regardless of vessel update volume.
     useEffect(() => {
         const interval = setInterval(() => {
+            if (isDemoMode) return;
             const vessels = Array.from(vesselMapRef.current.values()).filter(
                 (v) => v.lat !== null && v.lon !== null
             );
@@ -134,7 +137,36 @@ export default function GlobeViewComponent() {
         }, 500);
 
         return () => clearInterval(interval);
-    }, [vesselMapRef]);
+    }, [vesselMapRef, isDemoMode]);
+
+    useEffect(() => {
+        if (!isDemoMode) return;
+        const count = demoVessels.length;
+        const positions = new Float32Array(count * 2);
+        const colors = new Uint8Array(count * 4);
+        
+        for (let i = 0; i < count; i++) {
+            const v = demoVessels[i];
+            positions[i * 2] = v.lon ?? 0;
+            positions[i * 2 + 1] = v.lat ?? 0;
+            
+            const r = v.sanctions_match ? 255 : v.is_anomaly ? 255 : 52;
+            const g = v.sanctions_match ? 68  : v.is_anomaly ? 184 : 152;
+            const b = v.sanctions_match ? 68  : v.is_anomaly ? 0   : 219;
+            
+            colors[i * 4]     = r;
+            colors[i * 4 + 1] = g;
+            colors[i * 4 + 2] = b;
+            colors[i * 4 + 3] = v.is_anomaly || v.sanctions_match ? 255 : 210;
+        }
+        
+        setGlobeData({ 
+            positions, 
+            colors, 
+            vessels: demoVessels as any, 
+            count 
+        });
+    }, [isDemoMode, demoVessels]);
 
     // ── GridLayer density map (toggled via showHeatmap) ──────────────────
     const heatmapLayer = new GridLayer({
@@ -422,6 +454,14 @@ export default function GlobeViewComponent() {
                     </div>
 
                     {/* Realtime / polling indicator */}
+                    {isDemoMode && (
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded border border-[#eab308] bg-[#eab308]/10">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#eab308]" style={{ boxShadow: '0 0 4px #eab308' }} />
+                            <span className="text-[#eab308] text-xs font-data tracking-widest">
+                                DEMO
+                            </span>
+                        </div>
+                    )}
                     <div className="flex items-center gap-1.5">
                         <div
                             className={`w-1.5 h-1.5 rounded-full ${realtimeActiveRef.current ? 'bg-accent-cyan' : 'bg-alert-warning'}`}
