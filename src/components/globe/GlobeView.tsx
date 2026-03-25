@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import DeckGL from '@deck.gl/react';
 import { _GlobeView as GlobeView } from '@deck.gl/core';
 import { ScatterplotLayer, GeoJsonLayer, GridCellLayer, PolygonLayer } from '@deck.gl/layers';
+import { GridLayer } from '@deck.gl/aggregation-layers';
 import usePiracyData, { PiracyIncident } from '@/hooks/usePiracyData';
 import { SpillResult } from '@/hooks/useSpillPredictor';
 import SpillPanel from '../panels/SpillPanel';
@@ -77,6 +78,7 @@ export default function GlobeViewComponent() {
     const [showPiracy, setShowPiracy] = useState(true);
     const [selectedPiracy, setSelectedPiracy] = useState<PiracyIncident | null>(null);
     const [spillResult, setSpillResult] = useState<SpillResult | null>(null);
+    const [showHeatmap, setShowHeatmap] = useState(false);
     const { incidents: piracyIncidents, riskZones } = usePiracyData();
 
     const darkFleetVessels = useMemo(
@@ -134,8 +136,43 @@ export default function GlobeViewComponent() {
         return () => clearInterval(interval);
     }, [vesselMapRef]);
 
+    // ── GridLayer density map (toggled via showHeatmap) ──────────────────
+    const heatmapLayer = new GridLayer({
+        id: 'vessel-density',
+        data: globeData.vessels.filter((d: any) =>
+            d.lat != null && d.lon != null &&
+            d.lat !== 0 && d.lon !== 0
+        ),
+        getPosition: (d: any) => [d.lon as number, d.lat as number],
+        cellSize: 50000,          // 50km grid cells — visible at global zoom
+        extruded: false,          // flat — no 3D columns on globe
+        pickable: false,
+        opacity: 0.8,
+        colorRange: [
+            [0,   30,  80,  160],   // very sparse  — dark navy
+            [0,   70,  120, 180],   // sparse       — dark blue
+            [0,   120, 160, 200],   // moderate     — blue
+            [0,   170, 200, 220],   // medium       — teal
+            [0,   212, 255, 235],   // dense        — accent cyan
+            [255, 255, 255, 255],   // very dense   — white
+        ] as [number, number, number, number][],
+        elevationScale: 0,
+        getColorWeight: (d: any) => {
+            if (d.sanctions_match) return 3
+            if (d.is_anomaly) return 2
+            if ((d.dark_fleet_score ?? 0) > 60) return 1.5
+            return 1
+        },
+        colorAggregation: 'SUM',
+        updateTriggers: {
+            getPosition: globeData.count,
+        },
+    })
+
     // ── deck.gl layers ─────────────────────────────────────────────────────────
-    const layers = [
+    const layers = showHeatmap
+        ? [heatmapLayer]
+        : [
         new GridCellLayer({
             id: 'sst',
             data: sstData,
@@ -341,7 +378,26 @@ export default function GlobeViewComponent() {
                 onError={(error: any) => console.error('[DeckGL]', error)}
             />
 
+            {/* ── Heatmap / Vessels toggle ──────────────────────────────────────── */}
+            <button
+                onClick={() => setShowHeatmap(prev => !prev)}
+                className={`
+                    absolute top-14 right-4 z-20
+                    px-3 py-1.5
+                    font-data text-xs tracking-widest
+                    border rounded
+                    transition-colors duration-200
+                    ${showHeatmap
+                        ? 'bg-[#00d4ff] text-[#0a0f1e] border-[#00d4ff]'
+                        : 'bg-transparent text-[#00d4ff] border-[#00d4ff] hover:bg-[#00d4ff]/10'
+                    }
+                `}
+            >
+                {showHeatmap ? 'VESSELS' : 'DENSITY'}
+            </button>
+
             {/* ── Top status bar ─────────────────────────────────────────────────── */}
+
             <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-2 glass-panel border-b border-glow z-10">
                 <div className="flex items-center gap-3">
                     <span className="font-heading text-white font-bold text-lg tracking-wide">
