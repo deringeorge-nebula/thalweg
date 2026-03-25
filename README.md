@@ -1,252 +1,144 @@
-# THALWEG
+# Thalweg — Real-time Maritime Intelligence
 
-**Real-time maritime intelligence. 37,000+ vessels. Live.**
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-thalweg.vercel.app-blue)](https://thalweg.vercel.app)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-green)](./LICENSE)
+[![Built with Next.js](https://img.shields.io/badge/Built%20with-Next.js%2014-black)](https://nextjs.org)
 
-[Live Demo](https://thalweg.vercel.app) · [API Docs](#api) · [Architecture](#architecture)
+Dark fleet detection. Sanctions monitoring. Spill prediction. 40,000+ live vessels.
+
+> What Palantir charges $5M/year for, built in 7 weeks by one naval architecture student.
+> Thalweg is open source under AGPL-3.0. It costs $0/month to run.
 
 ---
 
-THALWEG is an open-source maritime intelligence platform that tracks
-37,000+ vessels in real time, detects anomalous behavior, identifies
-dark fleet activity, monitors piracy incidents, and predicts oil spill
-drift using particle physics simulation.
+## Screenshot
 
-Built with Next.js, deck.gl, Supabase, and NOAA oceanographic data.
+![Thalweg Globe](./docs/screenshot.png)
+
+*40,000+ live vessels. Red = sanctions match. Orange = anomaly detected. Yellow = dark fleet score >60.*
 
 ---
 
 ## Features
 
-- **Live AIS Globe** — 37,000+ vessels rendered at 60fps on a 3D globe
-  using deck.gl WebGL layers. Realtime updates via Supabase Realtime.
-- **Anomaly Detection** — behavioral scoring flags vessels with unusual
-  speed, position jumps, or AIS gaps. Anomalies highlighted in amber.
-- **Dark Fleet Scoring** — composite risk score based on flag state,
-  AIS behavior, and sanctions proximity. Vessels scored 0–100.
-- **Sanctions Matching** — live cross-reference against OFAC/EU/UN
-  sanctions databases via OpenSanctions API.
-- **Piracy Monitoring** — 40+ active incident zones from IMB/UKMTO
-  rendered as interactive markers with incident detail panels.
-- **SST Layer** — sea surface temperature from NOAA CoRTAD rendered
-  as a heatmap overlay on the globe.
-- **Oil Spill Predictor** — 200-particle forward advection simulation
-  over 72 hours using NOAA NRT ocean currents + GFS wind data.
-  Returns GeoJSON contamination polygons and centroid drift.
-- **AI Intelligence Briefs** — per-vessel intelligence summaries
-  generated on demand using Claude AI.
-- **Public REST API** — 4 endpoints for vessel lookup, anomalies,
-  port congestion, and spill prediction.
+| Feature | Description | Data Source |
+|---|---|---|
+| Live Vessel Globe | 40,000+ vessels on interactive 3D globe | AISStream.io |
+| Dark Fleet Detection | 0–100 risk score per vessel | AIS telemetry (multi-signal) |
+| Sanctions Matching | Auto cross-reference per vessel | OpenSanctions (OFAC/EU/UN/UK) |
+| AIS Anomaly Detection | Spoofing, loitering, dark periods | AISStream.io |
+| Spill Risk & Trajectory | 24/48/72h drift polygons, PDF export | Copernicus Marine, NOAA |
+| Port Congestion | Live vessel density at 50+ major ports | AISStream.io |
+| Vessel Watch Alerts | Email alert on anomaly/sanctions hit | Resend + Supabase |
+| AI Intelligence Briefs | Per-vessel narrative report on demand | Internal inference |
+| Piracy Tracking | IMB incidents geocoded with risk zones | IMB Piracy Reporting Centre |
+| Vessel Density Heatmap | Shipping lane visualization | AISStream.io |
+| Sea Surface Temperature | Ocean condition overlay | Copernicus Marine Service |
+| Demo Mode | 28 pre-seeded vessels, no live data required | — |
 
 ---
 
-## API
+## Intelligence vs. Data
 
-Base URL: `https://thalweg.vercel.app`
+MarineTraffic and VesselFinder answer one question: where is this vessel right now? Thalweg answers the questions that follow. Why is this vessel here? Should it be here? Has it gone dark near a known ship-to-ship transfer zone? Does its declared flag, ownership chain, and recent port calls match its OFAC exposure? What happens to its cargo if it sinks in the next 72 hours?
 
-All endpoints are public. Rate limits apply per IP.
-
-### GET /api/vessel/[mmsi]
-
-Returns enriched vessel data including sanctions status and dark fleet score.
-
-```text
-GET /api/vessel/273250630
-```
-
-Response:
-```json
-{
-  "mmsi": "273250630",
-  "vessel_name": "BRATSK",
-  "flag_state": "RU",
-  "ship_type": "Tanker",
-  "dark_fleet_score": 74,
-  "sanctions_match": true,
-  "lat": 35.565,
-  "lon": 32.299,
-  "sog": 0.0
-}
-```
-
-Rate limit: 60 requests/minute
+The distinction matters operationally. A position feed is an input. Thalweg is the layer between raw AIS telemetry and an actionable intelligence picture — the same function performed by platforms costing hundreds of thousands of dollars annually, implemented transparently and available without a procurement cycle.
 
 ---
 
-### GET /api/anomalies
+## Quick Start
 
-Returns vessels currently flagged with behavioral anomalies.
+### Local Development
 
-```text
-GET /api/anomalies?limit=20
+```bash
+git clone https://github.com/deringeorge-nebula/thalweg
+cd thalweg
+npm install
+cp .env.example .env.local
+# Fill in your environment variables (see below)
+npm run dev
 ```
 
-Response:
-```json
-{
-  "anomalies": [
-    {
-      "mmsi": "431253000",
-      "vessel_name": "FUKUTOKUMARU NO.38",
-      "anomaly_type": "speed_jump",
-      "severity": 0.82,
-      "detected_at": "2026-03-24T11:00:00Z"
-    }
-  ],
-  "total": 847
-}
-```
+Open [http://localhost:3000](http://localhost:3000).
 
-Rate limit: 60 requests/minute
+### Deploy to Vercel
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/deringeorge-nebula/thalweg)
+
+One-click deploy. Set environment variables in the Vercel dashboard after cloning.
 
 ---
 
-### GET /api/port/[locode]
+## Environment Variables
 
-Returns port congestion metrics for a given UN/LOCODE.
-
-```text
-GET /api/port/AEJEA
-```
-
-Response:
-```json
-{
-  "locode": "AEJEA",
-  "port_name": "Jebel Ali",
-  "vessel_count": 142,
-  "congestion_score": 0.73,
-  "avg_wait_hours": 18.4,
-  "updated_at": "2026-03-24T12:00:00Z"
-}
-```
-
-Rate limit: 60 requests/minute
-
----
-
-### POST /api/spill
-
-Oil spill drift prediction using 200-particle forward advection over 72 hours.
-Uses NOAA CoastWatch Blended NRT Currents + NOAA GFS wind (3% Stokes drift).
-
-```text
-POST /api/spill
-Content-Type: application/json
-
-{
-  "lat": 25.276,
-  "lon": 55.296,
-  "vessel_type": "tanker",
-  "spill_tonnes": 5000,
-  "mmsi": "123456789"
-}
-```
-
-Parameters:
-
-| Parameter | Type | Required | Description |
+| Variable | Required | Description | Where to get it |
 |---|---|---|---|
-| lat | number | ✅ | Incident latitude (-90 to 90) |
-| lon | number | ✅ | Incident longitude (-180 to 180) |
-| vessel_type | string | ❌ | e.g. tanker, cargo, unknown |
-| spill_tonnes | number | ❌ | Estimated volume in tonnes (default: 500) |
-| mmsi | string | ❌ | Vessel MMSI for context |
-
-Response:
-```json
-{
-  "origin": { "lat": 25.276, "lon": 55.296 },
-  "footprints": {
-    "h24": { "type": "Polygon", "coordinates": [[...]] },
-    "h48": { "type": "Polygon", "coordinates": [[...]] },
-    "h72": { "type": "Polygon", "coordinates": [[...]] }
-  },
-  "centroid_drift": {
-    "h24": { "lat": 25.14, "lon": 55.47, "distance_km": 24 },
-    "h48": { "lat": 25.07, "lon": 55.60, "distance_km": 38 },
-    "h72": { "lat": 25.18, "lon": 55.63, "distance_km": 35 }
-  },
-  "particle_count": 200,
-  "data_sources": {
-    "currents": "NOAA CoastWatch Blended NRT - 2026-03-21",
-    "wind": "NOAA GFS - 2026-03-31"
-  }
-}
-```
-
-Rate limit: 10 requests/minute
-
-> ⚠️ **Disclaimer:** Simulation only. Not for emergency response use.
-> For real incidents contact USCG NRC (+1 800 424 8802) or your national authority.
+| `NEXT_PUBLIC_SUPABASE_URL` | Required | Supabase project URL | Supabase dashboard |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Required | Supabase anon key | Supabase dashboard |
+| `MY_SERVICE_ROLE_KEY` | Required | Supabase service role key (server-side only) | Supabase dashboard → Settings → API |
+| `UPSTASH_REDIS_REST_URL` | Required | Upstash Redis URL | upstash.com |
+| `UPSTASH_REDIS_REST_TOKEN` | Required | Upstash Redis token | upstash.com |
+| `RESEND_API_KEY` | Required | Email alerts via Resend | resend.com |
+| `NEXT_PUBLIC_DEMO_MODE` | Optional | Set to `true` for demo with seeded vessels | — |
 
 ---
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        THALWEG                                  │
-├──────────────────────────┬──────────────────────────────────────┤
-│     FRONTEND             │         BACKEND                      │
-│  Next.js 14 (App Router) │   Supabase (Postgres + Realtime)     │
-│  deck.gl WebGL Globe     │   Supabase Edge Functions (Deno)     │
-│  React hooks             │   Next.js API Routes                 │
-│  Tailwind CSS            │   Vercel (deployment)                │
-└──────────────────────────┴──────────────────────────────────────┘
-         │                              │
-         ▼                              ▼
-┌─────────────────┐          ┌──────────────────────┐
-│  AIS DATA       │          │  OCEAN DATA          │
-│  aisstream.io   │          │  NOAA CoastWatch NRT  │
-│  29k+ vessels   │          │  NOAA GFS Wind        │
-│  realtime       │          │  NOAA CoRTAD SST      │
-└─────────────────┘          └──────────────────────┘
-         │                              │
-         ▼                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    SUPABASE POSTGRES                            │
-│  vessels · vessel_positions · anomalies · sanctions             │
-│  piracy_incidents · port_congestion · ocean_tiles (storage)     │
-└─────────────────────────────────────────────────────────────────┘
-```
+The decisions below are non-obvious and worth explaining explicitly.
 
-## Tech Stack
+**Partitioned position table.** `vessel_positions` is partitioned by month rather than stored in a single table. At 40,000+ vessels updating continuously, a monolithic table degrades under range queries. Monthly partitions keep index sizes bounded and allow old partitions to be dropped cleanly within the 6-hour rolling retention window.
 
-| Layer | Technology |
-|---|---|
-| Frontend | Next.js 14, React 18, TypeScript |
-| Globe | deck.gl 9, WebGL2 |
-| Database | Supabase Postgres (Nano) |
-| Realtime | Supabase Realtime (WebSocket) |
-| Edge Functions | Deno (Supabase) |
-| Deployment | Vercel |
-| Ocean Data | NOAA ERDDAP (CoastWatch, GFS) |
-| AIS Data | aisstream.io |
-| AI Briefs | Claude (Anthropic) |
-| Sanctions | OpenSanctions API |
+**Float32Array with batch timer.** Vessel positions are buffered into a `Float32Array` and flushed to deck.gl on a 500ms timer, not stored in React state. Pushing 40,000 individual state updates per cycle would make the renderer unusable. The typed array feeds directly into the WebGL layer.
+
+**No ORM.** The Supabase client is used directly with raw queries throughout. At this data volume, ORM abstraction layers introduce measurable latency with no offsetting benefit.
+
+**Deno edge functions for intelligence.** Sanctions matching, dark fleet scoring, and anomaly detection run in Deno edge functions rather than Node.js API routes. This eliminates cold start penalties on the paths that matter most for latency.
+
+**No authentication.** Thalweg is a public intelligence platform. Adding an auth layer would reduce the friction of evaluation and adoption with no corresponding security benefit — all intelligence is derived from public data sources.
 
 ---
 
-## Local Development
+## Tech Stack
 
-```bash
-git clone https://github.com/deringeorge-nebula/thalweg.git
-cd thalweg
-npm install
-cp .env.example .env.local   # fill in your keys
-npm run dev
-```
+| Layer | Technology | Why |
+|---|---|---|
+| Frontend | Next.js 14 App Router | SSR + edge middleware |
+| Globe | deck.gl (GlobeView) | WebGL, 40,000+ points at 60fps |
+| Database | Supabase (Postgres + Realtime) | Live updates + edge functions |
+| Hosting | Vercel | Edge network, zero-config deploy |
+| Rate Limiting | Upstash Redis | Serverless-compatible, 10 req/10s |
+| Email | Resend | Transactional alerts, free tier |
+| Intelligence | Deno Edge Functions | Low-latency, no cold start |
 
-Required environment variables (see `.env.example`):
+---
 
-```text
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-MY_SERVICE_ROLE_KEY=
-ANTHROPIC_API_KEY=
-OPENSANCTIONS_API_KEY=
-AISSTREAM_API_KEY=
-```
+## API
+
+All endpoints are public and rate-limited at 10 requests per 10 seconds via Upstash Redis.
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/anomalies` | GET | Active anomalies list |
+| `/api/darkfleet` | GET | Dark fleet vessel list |
+| `/api/vessel/[mmsi]` | GET | Full vessel intelligence for MMSI |
+| `/api/port/[locode]` | GET | Congestion data for a port |
+| `/api/spill` | POST | Spill prediction for MMSI |
+| `/api/watch` | POST | Add vessel watch (email alert) |
+| `/api/watch` | DELETE | Remove vessel watch |
+
+---
+
+## Contributing
+
+Thalweg is licensed under AGPL-3.0. The source code is available in full. Pull requests are welcome, particularly for:
+
+- A more rigorous AIS gap vs. coverage-hole classifier (current heuristic conflates the two)
+- Oil spill diffusion model improvement (current implementation uses a simplified Fay-Grotjahn spread; a stochastic particle model would improve 48/72h accuracy)
+- Additional sanctions list sources beyond OFAC/EU/UN/UK
+- Port berth capacity database (currently using vessel density as a proxy for congestion)
+
+Please open an issue before starting significant work.
 
 ---
 
@@ -254,29 +146,24 @@ AISSTREAM_API_KEY=
 
 | Source | Data | Update Frequency |
 |---|---|---|
-| aisstream.io | Vessel positions, AIS messages | Real-time |
-| NOAA CoastWatch | Blended NRT ocean currents | Daily |
-| NOAA GFS | 10m wind (u/v components) | 6-hourly |
-| NOAA CoRTAD | Sea surface temperature | Weekly |
-| IMB/UKMTO | Piracy incident reports | Weekly |
-| OpenSanctions | OFAC/EU/UN sanctions lists | Daily |
+| AISStream.io | Real-time vessel telemetry (WebSocket) | Continuous |
+| OpenSanctions | OFAC, EU Consolidated List, UN Security Council, UK sanctions | Daily sync |
+| Global Fishing Watch | Fishing vessel activity, MPA violations | Near real-time |
+| Copernicus Marine Service | Ocean currents, sea surface temperature | 6-hourly |
+| IMB Piracy Reporting Centre | Incident database | As published |
+| NOAA | Weather, wave height for spill modeling | Hourly |
+| MarineRegions.org | EEZ and MPA boundaries | Static with periodic updates |
 
 ---
 
-## Disclaimer
+## Founder Note
 
-THALWEG is a research and demonstration platform.
-
-- AIS data may be delayed, spoofed, or incomplete
-- Spill drift predictions are simulations — not for emergency response use
-- Sanctions matching is approximate — verify through official channels
-- Dark fleet scoring is probabilistic — not a legal determination
-
-For maritime emergencies contact MRCC or USCG NRC: **+1 800 424 8802**
+This project was built from Visakhapatnam — India's primary eastern deep-water port and home to the Eastern Naval Command. A naval architecture program here is not an abstract context for a maritime software project; it means daily proximity to vessel draft restrictions, tidal windows, and the operational decisions that intelligence like this is meant to inform. The gap between what commercial maritime intelligence platforms cost and what a port authority, NGO, or independent analyst can actually afford is the specific problem Thalweg addresses. It was built in 7 weeks by one person. The codebase reflects that. Contributions are welcome.
 
 ---
 
 ## License
 
-AGPL-3.0 — free to use and modify. Any deployment must also be open source.
-See [LICENSE](./LICENSE) for full terms.
+[AGPL-3.0](./LICENSE)
+
+Commercial use requires either compliance with AGPL-3.0 (publishing all modifications) or a separate licensing arrangement.
