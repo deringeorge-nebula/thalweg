@@ -1,4 +1,4 @@
-# Thalweg — Real-time Maritime Intelligence
+# Thalweg - Real-time Maritime Intelligence
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-thalweg.vercel.app-blue)](https://thalweg.vercel.app)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-green)](./LICENSE)
@@ -34,7 +34,7 @@ Dark fleet detection. Sanctions monitoring. Spill prediction. 40,000+ live vesse
 | Piracy Tracking | IMB incidents geocoded with risk zones | IMB Piracy Reporting Centre |
 | Vessel Density Heatmap | Shipping lane visualization | AISStream.io |
 | Sea Surface Temperature | Ocean condition overlay | Copernicus Marine Service |
-| Demo Mode | 28 pre-seeded vessels, no live data required | — |
+| Demo Mode | 28 pre-seeded vessels, no live data required | - |
 
 ---
 
@@ -42,7 +42,7 @@ Dark fleet detection. Sanctions monitoring. Spill prediction. 40,000+ live vesse
 
 MarineTraffic and VesselFinder answer one question: where is this vessel right now? Thalweg answers the questions that follow. Why is this vessel here? Should it be here? Has it gone dark near a known ship-to-ship transfer zone? Does its declared flag, ownership chain, and recent port calls match its OFAC exposure? What happens to its cargo if it sinks in the next 72 hours?
 
-The distinction matters operationally. A position feed is an input. Thalweg is the layer between raw AIS telemetry and an actionable intelligence picture — the same function performed by platforms costing hundreds of thousands of dollars annually, implemented transparently and available without a procurement cycle.
+The distinction matters operationally. A position feed is an input. Thalweg is the layer between raw AIS telemetry and an actionable intelligence picture - the same function performed by platforms costing hundreds of thousands of dollars annually, implemented transparently and available without a procurement cycle.
 
 ---
 
@@ -79,7 +79,7 @@ One-click deploy. Set environment variables in the Vercel dashboard after clonin
 | `UPSTASH_REDIS_REST_URL` | Required | Upstash Redis URL | upstash.com |
 | `UPSTASH_REDIS_REST_TOKEN` | Required | Upstash Redis token | upstash.com |
 | `RESEND_API_KEY` | Required | Email alerts via Resend | resend.com |
-| `NEXT_PUBLIC_DEMO_MODE` | Optional | Set to `true` for demo with seeded vessels | — |
+| `NEXT_PUBLIC_DEMO_MODE` | Optional | Set to `true` for demo with seeded vessels | - |
 
 ---
 
@@ -95,7 +95,7 @@ The decisions below are non-obvious and worth explaining explicitly.
 
 **Deno edge functions for intelligence.** Sanctions matching, dark fleet scoring, and anomaly detection run in Deno edge functions rather than Node.js API routes. This eliminates cold start penalties on the paths that matter most for latency.
 
-**No authentication.** Thalweg is a public intelligence platform. Adding an auth layer would reduce the friction of evaluation and adoption with no corresponding security benefit — all intelligence is derived from public data sources.
+**No authentication.** Thalweg is a public intelligence platform. Adding an auth layer would reduce the friction of evaluation and adoption with no corresponding security benefit - all intelligence is derived from public data sources.
 
 ---
 
@@ -158,7 +158,7 @@ Please open an issue before starting significant work.
 
 ## Founder Note
 
-This project was built from Visakhapatnam — India's primary eastern deep-water port and home to the Eastern Naval Command. A naval architecture program here is not an abstract context for a maritime software project; it means daily proximity to vessel draft restrictions, tidal windows, and the operational decisions that intelligence like this is meant to inform. The gap between what commercial maritime intelligence platforms cost and what a port authority, NGO, or independent analyst can actually afford is the specific problem Thalweg addresses. It was built in 7 weeks by one person. The codebase reflects that. Contributions are welcome.
+This project was built from Visakhapatnam - India's primary eastern deep-water port and home to the Eastern Naval Command. A naval architecture program here is not an abstract context for a maritime software project; it means daily proximity to vessel draft restrictions, tidal windows, and the operational decisions that intelligence like this is meant to inform. The gap between what commercial maritime intelligence platforms cost and what a port authority, NGO, or independent analyst can actually afford is the specific problem Thalweg addresses. It was built in 7 weeks by one person. The codebase reflects that. Contributions are welcome.
 
 ---
 
