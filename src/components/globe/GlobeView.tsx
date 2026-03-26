@@ -28,6 +28,7 @@ import { usePortCongestion } from '@/hooks/usePortCongestion';
 import type { PortWithCongestion } from '@/hooks/usePortCongestion';
 import PortPanel from './PortPanel';
 import { trackVesselClick } from '@/lib/analytics';
+import { ComparePanel } from './ComparePanel';
 
 // Natural Earth 110m land polygons — public domain, no API key required
 const LAND_DATA_URL =
@@ -78,6 +79,8 @@ export default function GlobeViewComponent() {
         clearRoute, threats, isAnalyzing, threatCount
     } = useRouteRisk();
     const [selectedVessel, setSelectedVessel] = useState<VesselRow | null>(null);
+    const [comparedVessel, setComparedVessel] = useState<any>(null);
+    const [showCompare, setShowCompare] = useState(false);
     const { track } = useVesselTrack(
         selectedVessel?.mmsi ? Number(selectedVessel.mmsi) : null
     );
@@ -459,7 +462,18 @@ export default function GlobeViewComponent() {
                         setSelectedPort(null)
                         setSelectedPiracy(null)
                         setSpillResult(null)
-                        setSelectedVessel(v);
+                        if (selectedVessel &&
+                            selectedVessel.mmsi !== v.mmsi &&
+                            !showCompare) {
+                            // Second vessel clicked — trigger comparison
+                            setComparedVessel(v)
+                            setShowCompare(true)
+                        } else {
+                            // First click or same vessel — normal selection
+                            setSelectedVessel(v)
+                            setShowCompare(false)
+                            setComparedVessel(null)
+                        }
                         trackVesselClick(
                             v.mmsi,
                             v.vessel_name ?? 'Unknown',
@@ -731,6 +745,17 @@ export default function GlobeViewComponent() {
                         onSpillResult={setSpillResult}
                     />
                 </div>
+            )}
+
+            {showCompare && selectedVessel && comparedVessel && (
+                <ComparePanel
+                    vesselA={{ ...selectedVessel, mmsi: Number(selectedVessel.mmsi) } as any}
+                    vesselB={{ ...comparedVessel, mmsi: Number(comparedVessel.mmsi) } as any}
+                    onClose={() => {
+                        setShowCompare(false)
+                        setComparedVessel(null)
+                    }}
+                />
             )}
         </div>
     );
