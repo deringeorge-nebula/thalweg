@@ -569,7 +569,7 @@ export default function GlobeViewComponent({
 
             {/* ── Top status bar ─────────────────────────────────────────────────── */}
             {!embedMode && (
-            <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-2 glass-panel border-b border-glow z-10">
+            <div className="absolute top-0 left-0 right-0 flex flex-wrap items-center justify-between px-3 sm:px-4 py-2 glass-panel border-b border-glow z-10 transition-all duration-200">
                 <div className="flex items-center gap-3">
                     <span className="font-heading text-white font-bold text-lg tracking-wide">
                         THALWEG
@@ -598,7 +598,7 @@ export default function GlobeViewComponent({
                     />
                 </div>
 
-                <div className="flex items-center gap-4 text-xs font-data">
+                <div className="flex items-center gap-2 sm:gap-4 text-xs font-data overflow-x-auto sm:overflow-x-visible flex-nowrap sm:flex-wrap -mx-1 px-1 sm:mx-0 sm:px-0 pb-0.5 sm:pb-0">
                     {/* Live vessel count */}
                     <div className="flex items-center gap-1.5">
                         <div
@@ -639,7 +639,7 @@ export default function GlobeViewComponent({
                     <button
                         onClick={() => setIsRouteMode(!isRouteMode)}
                         className={`
-                            text-xs font-data px-2 py-0.5 rounded border transition-colors
+                            text-xs font-data px-2 py-0.5 min-h-[36px] sm:min-h-0 rounded border transition-colors touch-manipulation flex-shrink-0
                             ${isRouteMode
                                 ? 'border-[#00d4ff] bg-[#00d4ff]/20 text-[#00d4ff]'
                                 : 'border-text-muted text-text-muted hover:border-[#00d4ff] hover:text-[#00d4ff]'
@@ -647,8 +647,8 @@ export default function GlobeViewComponent({
                         `}
                     >
                         {isRouteMode
-                            ? (waypoints.length === 0 ? '⇧ CLICK ORIGIN'
-                                : waypoints.length === 1 ? '⇧ CLICK DEST'
+                            ? (waypoints.length === 0 ? <><span className="hidden sm:inline">⇧ CLICK </span>ORIGIN</>
+                                : waypoints.length === 1 ? <><span className="hidden sm:inline">⇧ CLICK </span>DEST</>
                                     : `${threatCount} THREATS`)
                             : 'ROUTE'
                         }
@@ -656,7 +656,7 @@ export default function GlobeViewComponent({
 
                     <button
                         onClick={() => setSstVisible((v) => !v)}
-                        className={`text-xs font-data px-2 py-0.5 rounded border transition-colors ${sstVisible
+                        className={`text-xs font-data px-2 py-0.5 min-h-[36px] sm:min-h-0 rounded border transition-colors touch-manipulation flex-shrink-0 ${sstVisible
                             ? 'border-accent-cyan text-accent-cyan'
                             : 'border-text-muted text-text-muted'
                             }`}
@@ -665,7 +665,7 @@ export default function GlobeViewComponent({
                     </button>
                     <button
                         onClick={() => setDarkFleetVisible((v) => !v)}
-                        className={`text-xs font-data px-2 py-0.5 rounded border transition-colors ${darkFleetVisible
+                        className={`text-xs font-data px-2 py-0.5 min-h-[36px] sm:min-h-0 rounded border transition-colors touch-manipulation flex-shrink-0 ${darkFleetVisible
                             ? 'border-alert-critical text-alert-critical'
                             : 'border-text-muted text-text-muted'
                             }`}
@@ -675,7 +675,7 @@ export default function GlobeViewComponent({
                     {/* PIRACY button */}
                     <button
                         onClick={() => setShowPiracy(p => !p)}
-                        className={`px-3 py-1 rounded text-xs font-data font-medium border transition-all ${showPiracy
+                        className={`px-3 py-1 min-h-[36px] sm:min-h-0 rounded text-xs font-data font-medium border transition-all touch-manipulation flex-shrink-0 ${showPiracy
                             ? 'bg-red-900/40 border-red-500 text-red-400'
                             : 'bg-navy-950/40 border-gray-600 text-gray-400 hover:border-gray-400'
                             }`}
@@ -783,7 +783,7 @@ export default function GlobeViewComponent({
 
             {/* Spill prediction — LEFT side, independent of vessel panel */}
             {selectedVessel && (
-                <div className="absolute left-4 top-20 w-96 max-w-[calc(50vw-32px)] pointer-events-auto z-10">
+                <div className="absolute left-3 sm:left-4 top-16 w-[calc(100vw-24px)] sm:w-96 max-w-[calc(50vw-32px)] pointer-events-auto z-10">
                     <SpillPanel
                         vesselLat={selectedVessel.lat}
                         vesselLon={selectedVessel.lon}

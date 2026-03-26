@@ -195,7 +195,7 @@ export function ComparePanel({ vesselA, vesselB, onClose }: ComparePanelProps) {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-[#0a0f1e]/98 backdrop-blur-sm border-t-2 border-[#00d4ff] z-50 max-h-[45vh] overflow-y-auto">
+    <div className="fixed bottom-0 left-0 right-0 bg-[#0a0f1e]/98 backdrop-blur-sm border-t-2 border-[#00d4ff] z-50 max-h-[60vh] sm:max-h-[45vh] overflow-y-auto">
       <div className="max-w-6xl mx-auto px-6 py-4">
         {/* Header Row */}
         <div className="flex items-center justify-between mb-4">
@@ -211,7 +211,7 @@ export function ComparePanel({ vesselA, vesselB, onClose }: ComparePanelProps) {
         </div>
 
         {/* Two Column Grid */}
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           <VesselColumn
             vessel={vesselA}
             other={vesselB}

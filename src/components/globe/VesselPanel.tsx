@@ -52,7 +52,7 @@ export default function VesselPanel({ vessel, onClose }: Props) {
     };
 
     return (
-        <div className="absolute top-14 right-4 w-72 glass-panel rounded z-20 overflow-hidden">
+        <div className="absolute top-16 right-3 sm:right-4 w-[calc(100vw-24px)] sm:w-72 max-w-sm glass-panel rounded z-20 overflow-y-auto max-h-[80vh]">
             {/* Header */}
             <div className="flex items-start justify-between p-4 border-b border-glow">
                 <div className="flex-1 min-w-0">
