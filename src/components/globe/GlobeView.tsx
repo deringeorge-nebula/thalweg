@@ -576,7 +576,7 @@ export default function GlobeViewComponent({
                         <span className="font-heading text-white font-bold text-lg tracking-wide">
                             THALWEG
                         </span>
-                        <span className="text-text-muted text-xs font-data">
+                        <span className="text-text-muted text-xs font-data hidden sm:block">
                             MARITIME INTELLIGENCE
                         </span>
                     </div>
@@ -602,12 +602,12 @@ export default function GlobeViewComponent({
                 </div>
 
                 {/* Row 2 */}
-                <div className="relative w-full overflow-hidden">
+                <div className="relative w-full sm:w-auto overflow-hidden sm:overflow-visible flex-shrink-0">
                     {/* Right fade hint */}
-                    <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0a0f1e] to-transparent pointer-events-none z-10" />
+                    <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0a0f1e] to-transparent pointer-events-none z-10 sm:hidden" />
                     
                     {/* Toggle buttons */}
-                    <div className="flex gap-1.5 overflow-x-auto scrollbar-none flex-nowrap w-full pb-1">
+                    <div className="flex items-center font-data text-xs gap-1.5 sm:gap-4 overflow-x-auto sm:overflow-visible scrollbar-none flex-nowrap sm:flex-wrap w-full sm:w-auto pb-1 sm:pb-0">
                         {/* Live vessel count */}
                     <div className="flex items-center gap-1.5">
                         <div
@@ -698,8 +698,8 @@ export default function GlobeViewComponent({
 
             {/* ── Vessel type legend ─────────────────────────────────────────────── */}
             {!embedMode && (
-            <div className="absolute bottom-6 left-4 glass-panel rounded z-10 text-[9px] sm:text-[10px] p-2 sm:p-3 max-w-[140px] sm:max-w-none">
-                <div className="text-text-muted text-xs font-data mb-2 uppercase tracking-widest">
+            <div className="absolute bottom-6 left-4 glass-panel rounded z-10 p-2 sm:p-3 max-w-[140px] sm:max-w-none">
+                <div className="text-text-muted text-[10px] sm:text-xs font-data mb-1 sm:mb-2 uppercase tracking-widest">
                     Vessel Types
                 </div>
                 {[
@@ -710,23 +710,23 @@ export default function GlobeViewComponent({
                     { label: 'High Speed', color: '#F39C12' },
                     { label: 'Unknown', color: '#7F8C8D' },
                 ].map(({ label, color }) => (
-                    <div key={label} className="flex items-center mb-1 gap-1 sm:gap-1.5 py-0.5">
+                    <div key={label} className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
                         <div
-                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                            className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0"
                             style={{ backgroundColor: color, boxShadow: `0 0 4px ${color}` }}
                         />
-                        <span className="text-text-secondary text-xs font-body">{label}</span>
+                        <span className="text-text-secondary text-[10px] sm:text-xs font-body">{label}</span>
                     </div>
                 ))}
                 {/* Alert indicators */}
-                <div className="border-t border-glow mt-2 pt-2">
-                    <div className="flex items-center mb-1 gap-1 sm:gap-1.5 py-0.5">
-                        <div className="w-2.5 h-2.5 rounded-full bg-alert-critical" style={{ boxShadow: '0 0 4px #FF4444' }} />
-                        <span className="text-alert-critical text-xs font-body">Sanctions Match</span>
+                <div className="border-t border-glow mt-1.5 sm:mt-2 pt-1.5 sm:pt-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+                        <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-alert-critical" style={{ boxShadow: '0 0 4px #FF4444' }} />
+                        <span className="text-alert-critical text-[10px] sm:text-xs font-body">Sanctions Match</span>
                     </div>
-                    <div className="flex items-center gap-1 sm:gap-1.5 py-0.5">
-                        <div className="w-2.5 h-2.5 rounded-full bg-alert-warning" style={{ boxShadow: '0 0 4px #FFB800' }} />
-                        <span className="text-alert-warning text-xs font-body">Anomaly Detected</span>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                        <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-alert-warning" style={{ boxShadow: '0 0 4px #FFB800' }} />
+                        <span className="text-alert-warning text-[10px] sm:text-xs font-body">Anomaly Detected</span>
                     </div>
                 </div>
             </div>
