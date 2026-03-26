@@ -22,30 +22,50 @@ export function useVesselStream() {
 
     // ── Initial bulk fetch ─────────────────────────────────────────────────────
     useEffect(() => {
-        async function fetchInitial() {
-            const { data, error } = await supabase
-                .from('vessels')
-                .select('mmsi,imo_number,vessel_name,call_sign,flag_state,ship_type,type_category,type_color,lat,lon,sog,cog,true_heading,nav_status,destination,is_active,is_anomaly,sanctions_match,dark_fleet_score,last_update')
-                .eq('is_active', true)
-                .not('lat', 'is', null)
-                .not('lon', 'is', null)
-                .limit(INITIAL_FETCH_LIMIT);
+        async function initialLoad() {
+            let page = 0
+            const pageSize = 10000
+            let hasMore = true
 
-            if (error) {
-                console.error('[useVesselStream] Initial fetch error:', error.message);
-                return;
+            while (hasMore) {
+                const { data, error } = await supabase
+                    .from('vessels')
+                    .select(`mmsi, vessel_name, type_category, type_color,
+                 lat, lon, sog, cog, nav_status, is_active,
+                 is_anomaly, anomaly_type, sanctions_match, 
+                 dark_fleet_score, last_update`)
+                    .eq('is_active', true)
+                    .not('lat', 'is', null)
+                    .range(page * pageSize, (page + 1) * pageSize - 1)
+                    .order('last_update', { ascending: false })
+
+                if (error || !data || data.length === 0) {
+                    hasMore = false
+                    break
+                }
+
+                // Merge into vesselMapRef
+                for (const vessel of data) {
+                    vesselMapRef.current.set(vessel.mmsi, vessel as any)
+                }
+
+                if (data.length < pageSize) {
+                    hasMore = false
+                } else {
+                    page++
+                }
+
+                // Safety cap: max 5 pages = 50,000 vessels
+                if (page >= 5) hasMore = false
             }
 
-            if (data) {
-                vesselMapRef.current.clear();
-                data.forEach((v) => vesselMapRef.current.set(v.mmsi, v as VesselRow));
-                setTotalCount(data.length);
-                setDataFreshness(new Date());
-                setIsLoading(false);
-            }
+            setTotalCount(vesselMapRef.current.size);
+            setDataFreshness(new Date());
+            setIsLoading(false);
         }
 
-        fetchInitial();
+        initialLoad()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // ── Supabase Realtime subscription ───────────────────────────────────────

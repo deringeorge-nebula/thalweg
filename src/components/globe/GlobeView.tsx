@@ -277,6 +277,9 @@ export default function GlobeViewComponent() {
                 pickable: true,
                 onClick: ({ object }: { object: any }) => {
                     if (object) {
+                        setSelectedPort(null)
+                        setSelectedPiracy(null)
+                        setSpillResult(null)
                         setSelectedVessel(object);
                         trackVesselClick(
                             object.mmsi,
@@ -306,8 +309,10 @@ export default function GlobeViewComponent() {
                 pickable: true,
                 onClick: ({ object }: { object: PortWithCongestion }) => {
                     if (object) {
-                        setSelectedVessel(null);
-                        setSelectedPort(object);
+                        setSelectedVessel(null)
+                        setSelectedPiracy(null)
+                        setSpillResult(null)
+                        setSelectedPort(object)
                     }
                 },
             }),
@@ -356,7 +361,12 @@ export default function GlobeViewComponent() {
                 lineWidthMinPixels: 1,
                 pickable: true,
                 onClick: ({ object }: { object: any }) => {
-                    if (object) setSelectedPiracy(object as PiracyIncident)
+                    if (object) {
+                        setSelectedVessel(null)
+                        setSelectedPort(null)
+                        setSpillResult(null)
+                        setSelectedPiracy(object as PiracyIncident)
+                    }
                 },
                 updateTriggers: { getFillColor: [], getRadius: [] }
             })] : []),
@@ -423,6 +433,9 @@ export default function GlobeViewComponent() {
                 onClick: ({ index }: any) => {
                     if (index >= 0 && index < globeData.vessels.length) {
                         const v = globeData.vessels[index];
+                        setSelectedPort(null)
+                        setSelectedPiracy(null)
+                        setSpillResult(null)
                         setSelectedVessel(v);
                         trackVesselClick(
                             v.mmsi,
@@ -490,6 +503,9 @@ export default function GlobeViewComponent() {
                     <VesselSearchBar
                         vessels={globeData.vessels}
                         onVesselSelect={(vessel) => {
+                            setSelectedPort(null)
+                            setSelectedPiracy(null)
+                            setSpillResult(null)
                             setSelectedVessel(vessel)
                             trackVesselClick(
                                 vessel.mmsi,
@@ -642,21 +658,47 @@ export default function GlobeViewComponent() {
                 </div>
             )}
 
-            {/* ── Vessel detail panel ────────────────────────────────────────────── */}
+            {/* ── RIGHT SIDE PANELS (one at a time) ─────────── */}
+
+            {/* Piracy incident detail */}
             {selectedPiracy && (
                 <PiracyPanel
                     incident={selectedPiracy}
                     onClose={() => setSelectedPiracy(null)}
                 />
             )}
+
+            {/* Vessel detail — RIGHT side */}
             {selectedVessel && (
                 <VesselPanel
                     vessel={selectedVessel}
                     onClose={() => { setSelectedVessel(null); setSpillResult(null) }}
                 />
             )}
+
+            {/* Port detail — RIGHT side */}
+            {selectedPort && (
+                <PortPanel
+                    port={selectedPort}
+                    onClose={() => setSelectedPort(null)}
+                />
+            )}
+
+            {/* Route risk panel — RIGHT side, only when no vessel/port */}
+            {!selectedVessel && !selectedPort && (
+                <RouteRiskPanel
+                    waypoints={waypoints}
+                    threats={threats}
+                    isAnalyzing={isAnalyzing}
+                    onClear={clearRoute}
+                />
+            )}
+
+            {/* ── LEFT SIDE PANELS ────────────────────────────── */}
+
+            {/* Spill prediction — LEFT side, independent of vessel panel */}
             {selectedVessel && (
-                <div className="absolute right-4 top-20 w-96 max-w-[calc(100vw-32px)] pointer-events-auto z-10 mt-[420px]">
+                <div className="absolute left-4 top-20 w-96 max-w-[calc(50vw-32px)] pointer-events-auto z-10">
                     <SpillPanel
                         vesselLat={selectedVessel.lat}
                         vesselLon={selectedVessel.lon}
@@ -666,20 +708,6 @@ export default function GlobeViewComponent() {
                     />
                 </div>
             )}
-
-            {selectedPort && (
-                <PortPanel
-                    port={selectedPort}
-                    onClose={() => setSelectedPort(null)}
-                />
-            )}
-
-            <RouteRiskPanel
-                waypoints={waypoints}
-                threats={threats}
-                isAnalyzing={isAnalyzing}
-                onClear={clearRoute}
-            />
         </div>
     );
 }
