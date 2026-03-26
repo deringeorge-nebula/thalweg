@@ -602,8 +602,13 @@ export default function GlobeViewComponent({
                 </div>
 
                 {/* Row 2 */}
-                <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-0.5 flex-nowrap max-w-full">
-                    {/* Live vessel count */}
+                <div className="relative w-full overflow-hidden">
+                    {/* Right fade hint */}
+                    <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0a0f1e] to-transparent pointer-events-none z-10" />
+                    
+                    {/* Toggle buttons */}
+                    <div className="flex gap-1.5 overflow-x-auto scrollbar-none flex-nowrap w-full pb-1">
+                        {/* Live vessel count */}
                     <div className="flex items-center gap-1.5">
                         <div
                             className={`w-2 h-2 rounded-full ${isLoading ? 'bg-alert-warning' : 'bg-alert-ok'}`}
@@ -686,6 +691,7 @@ export default function GlobeViewComponent({
                     >
                         PIRACY
                     </button>
+                    </div>
                 </div>
             </div>
             )}
