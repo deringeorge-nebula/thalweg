@@ -9,6 +9,8 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import DeckGL from '@deck.gl/react';
 import { _GlobeView as GlobeView } from '@deck.gl/core';
+import { useVesselTrack } from '@/hooks/useVesselTrack';
+import { TripsLayer } from '@deck.gl/geo-layers';
 import { ScatterplotLayer, GeoJsonLayer, GridCellLayer, PolygonLayer, LineLayer } from '@deck.gl/layers';
 import { GridLayer } from '@deck.gl/aggregation-layers';
 import usePiracyData, { PiracyIncident } from '@/hooks/usePiracyData';
@@ -76,6 +78,9 @@ export default function GlobeViewComponent() {
         clearRoute, threats, isAnalyzing, threatCount
     } = useRouteRisk();
     const [selectedVessel, setSelectedVessel] = useState<VesselRow | null>(null);
+    const { track } = useVesselTrack(
+        selectedVessel?.mmsi ? Number(selectedVessel.mmsi) : null
+    );
     const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; vessel: VesselRow } | null>(null);
     const { ports } = usePortCongestion();
     const [selectedPort, setSelectedPort] = useState<PortWithCongestion | null>(null);
@@ -240,9 +245,27 @@ export default function GlobeViewComponent() {
         })
         : null
 
+    const trackLayer = track.length > 1
+      ? new TripsLayer({
+          id: 'vessel-track',
+          data: [{
+            path: track.map(p => [p.lon, p.lat]),
+            timestamps: track.map((_, i) => i),
+          }],
+          getPath: (d: any) => d.path,
+          getTimestamps: (d: any) => d.timestamps,
+          getColor: [0, 212, 255],
+          opacity: 0.8,
+          widthMinPixels: 2,
+          trailLength: track.length,
+          currentTime: track.length,
+          shadowEnabled: false,
+        })
+      : null
+
     // ── deck.gl layers ─────────────────────────────────────────────────────────
     const layers = showHeatmap
-        ? [heatmapLayer, routeLineLayer, waypointLayer].filter(Boolean)
+        ? [heatmapLayer, ...(trackLayer ? [trackLayer] : []), routeLineLayer, waypointLayer].filter(Boolean)
         : [
             new GridCellLayer({
                 id: 'sst',
@@ -447,6 +470,7 @@ export default function GlobeViewComponent() {
                     }
                 },
             }),
+            ...(trackLayer ? [trackLayer] : []),
             ...(routeLineLayer ? [routeLineLayer] : []),
             ...(waypointLayer ? [waypointLayer] : []),
         ];

@@ -277,6 +277,22 @@ const SUBSCRIPTION_PAYLOAD = JSON.stringify({
     FilterMessageTypes: ["PositionReport"],
 });
 
+// ─── Cleanup: delete positions older than 24h ─────────────────────────────
+async function cleanOldPositions() {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { error } = await supabase
+    .from("vessel_positions")
+    .delete()
+    .lt("recorded_at", cutoff)
+    
+  if (error) console.error("[ais-relay] Cleanup error:", error.message)
+  else console.log("[ais-relay] Old positions cleaned")
+}
+
+// Run cleanup every hour
+setInterval(cleanOldPositions, 60 * 60 * 1000)
+cleanOldPositions() // Also run once on startup
+
 let consecutiveFailures = 0;
 const MAX_BACKOFF_MS = 60_000;
 

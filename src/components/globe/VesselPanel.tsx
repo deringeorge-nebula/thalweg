@@ -8,6 +8,7 @@ import type { VesselRow } from '@/types/vessel';
 import { NAV_STATUS_LABELS } from '@/types/vessel';
 import WatchPanel from '@/components/panels/WatchPanel';
 import { trackIntelBrief } from '@/lib/analytics';
+import { useVesselTrack } from '@/hooks/useVesselTrack';
 
 interface Props {
     vessel: VesselRow;
@@ -18,6 +19,10 @@ export default function VesselPanel({ vessel, onClose }: Props) {
     const [brief, setBrief] = useState<string | null>(null);
     const [briefLoading, setBriefLoading] = useState(false);
     const [briefError, setBriefError] = useState<string | null>(null);
+
+    const { track, isLoading: trackLoading, hasTrack } = useVesselTrack(
+        vessel?.mmsi ? Number(vessel.mmsi) : null
+    );
 
     useEffect(() => {
         setBrief(null);
@@ -140,6 +145,32 @@ export default function VesselPanel({ vessel, onClose }: Props) {
                         />
                     </>
                 )}
+
+                <div className="mt-3 pt-3 border-t border-[#1a2744]">
+                    <div className="flex items-center justify-between">
+                        <span className="text-[#64748b] text-[10px] font-data uppercase tracking-widest">
+                            24H TRACK
+                        </span>
+                        {trackLoading ? (
+                            <span className="text-[#475569] text-[10px] font-data">
+                                Loading...
+                            </span>
+                        ) : hasTrack ? (
+                            <span className="text-[#00d4ff] text-[10px] font-data">
+                                {track.length} positions recorded
+                            </span>
+                        ) : (
+                            <span className="text-[#475569] text-[10px] font-data">
+                                No history yet
+                            </span>
+                        )}
+                    </div>
+                    {hasTrack && (
+                        <div className="text-[9px] font-data text-slate-500 mt-1">
+                            From {new Date(track[0].recorded_at).toUTCString().slice(0,22)} UTC
+                        </div>
+                    )}
+                </div>
 
                 {/* AI Intelligence Brief */}
                 <div className="border-t border-glow pt-3 mt-1">
