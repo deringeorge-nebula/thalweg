@@ -322,6 +322,62 @@ export default function ApiDocsPage() {
           </div>
         </section>
 
+        {/* EMBED WIDGET SECTION */}
+        <div>
+          <div className="flex items-center gap-3 mb-4">
+            <span className="bg-[#8b5cf6]/20 text-[#8b5cf6] text-xs 
+      font-data font-bold px-2 py-1 rounded">
+              EMBED
+            </span>
+            <span className="text-white font-data text-xl font-bold">
+              /embed
+            </span>
+          </div>
+          <p className="text-slate-400 text-sm mb-4">
+            Embed a live vessel map on any website using an iframe.
+            Accepts viewport and filter parameters.
+          </p>
+          <div className="overflow-x-auto bg-[#060c18] border 
+    border-[#1a2744] rounded-lg p-4 mb-4">
+            <pre><code className="text-[#00d4ff] text-xs font-data">
+              {`<iframe 
+  src="https://thalweg.vercel.app/embed?lat=1.29&lon=103.85&zoom=8&filter=sanctioned"
+  width="100%" 
+  height="500" 
+  frameborder="0"
+  title="Thalweg Maritime Intelligence">
+</iframe>`}
+            </code></pre>
+          </div>
+          <table className="w-full text-sm font-data">
+            <thead>
+              <tr className="bg-[#0d1424] text-slate-500 text-xs uppercase">
+                <th className="text-left p-2">Parameter</th>
+                <th className="text-left p-2">Type</th>
+                <th className="text-left p-2">Default</th>
+                <th className="text-left p-2">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ['lat', 'number', '20', 'Center latitude'],
+                ['lon', 'number', '80', 'Center longitude'],
+                ['zoom', 'number', '4', 'Map zoom level (1-12)'],
+                ['filter', 'string', 'null',
+                  'sanctioned · darkfleet · tanker · cargo'],
+              ].map(([param, type, def, desc]) => (
+                <tr key={param}
+                  className="border-b border-[#1a2744] text-slate-300">
+                  <td className="p-2 text-[#00d4ff]">{param}</td>
+                  <td className="p-2">{type}</td>
+                  <td className="p-2 text-slate-500">{def}</td>
+                  <td className="p-2">{desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
         {/* BOTTOM CTA SECTION */}
         <section className="mt-16 text-center">
           <p className="text-slate-400 text-lg">

@@ -67,7 +67,21 @@ const EMPTY_GLOBE_DATA: GlobeData = {
     count: 0,
 };
 
-export default function GlobeViewComponent() {
+interface GlobeViewProps {
+    embedMode?: boolean;
+    initialLat?: number;
+    initialLon?: number;
+    initialZoom?: number;
+    embedFilter?: string | null;
+}
+
+export default function GlobeViewComponent({
+    embedMode = false,
+    initialLat,
+    initialLon,
+    initialZoom,
+    embedFilter,
+}: GlobeViewProps = {}) {
     const { vesselMapRef, totalCount, isLoading, dataFreshness, realtimeActiveRef } =
         useVesselStream();
 
@@ -115,15 +129,41 @@ export default function GlobeViewComponent() {
             .catch((e) => console.warn('[SST] Failed to load:', e));
     }, []);
 
+    // ── Compute dynamic initial view state ───────────────────────────────────
+    const initialViewState = {
+        longitude: initialLon ?? 75,
+        latitude: initialLat ?? 15,
+        zoom: initialZoom ?? 1.8,
+        pitch: embedMode ? 0 : 45,
+        bearing: 0,
+    };
+
     // ── 500ms batch timer ─────────────────────────────────────────────────────
     // Reads from vesselMapRef (no React dependency), builds Float32Array,
     // triggers exactly ONE setState per 500ms regardless of vessel update volume.
     useEffect(() => {
         const interval = setInterval(() => {
             if (isDemoMode) return;
-            const vessels = Array.from(vesselMapRef.current.values()).filter(
+            let vessels = Array.from(vesselMapRef.current.values()).filter(
                 (v) => v.lat !== null && v.lon !== null
             );
+
+            if (embedMode && embedFilter) {
+                switch (embedFilter) {
+                    case 'sanctioned':
+                        vessels = vessels.filter(v => v.sanctions_match);
+                        break;
+                    case 'darkfleet':
+                        vessels = vessels.filter(v => (v.dark_fleet_score ?? 0) >= 60);
+                        break;
+                    case 'tanker':
+                        vessels = vessels.filter(v => v.type_category === 'Tanker');
+                        break;
+                    case 'cargo':
+                        vessels = vessels.filter(v => v.type_category === 'Cargo');
+                        break;
+                }
+            }
 
             if (vessels.length === 0) return;
 
@@ -494,7 +534,7 @@ export default function GlobeViewComponent() {
             {/* ── Globe ──────────────────────────────────────────────────────────── */}
             <DeckGL
                 views={new GlobeView()}
-                initialViewState={INITIAL_VIEW_STATE}
+                initialViewState={initialViewState}
                 controller
                 layers={layers}
                 style={{ background: '#0A1628' }}
@@ -508,6 +548,7 @@ export default function GlobeViewComponent() {
             />
 
             {/* ── Heatmap / Vessels toggle ──────────────────────────────────────── */}
+            {!embedMode && (
             <button
                 onClick={() => setShowHeatmap(prev => !prev)}
                 className={`
@@ -524,9 +565,10 @@ export default function GlobeViewComponent() {
             >
                 {showHeatmap ? 'VESSELS' : 'DENSITY'}
             </button>
+            )}
 
             {/* ── Top status bar ─────────────────────────────────────────────────── */}
-
+            {!embedMode && (
             <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-2 glass-panel border-b border-glow z-10">
                 <div className="flex items-center gap-3">
                     <span className="font-heading text-white font-bold text-lg tracking-wide">
@@ -642,8 +684,10 @@ export default function GlobeViewComponent() {
                     </button>
                 </div>
             </div>
+            )}
 
             {/* ── Vessel type legend ─────────────────────────────────────────────── */}
+            {!embedMode && (
             <div className="absolute bottom-6 left-4 glass-panel p-3 rounded z-10">
                 <div className="text-text-muted text-xs font-data mb-2 uppercase tracking-widest">
                     Vessel Types
@@ -676,6 +720,7 @@ export default function GlobeViewComponent() {
                     </div>
                 </div>
             </div>
+            )}
 
             {/* ── Hover tooltip ──────────────────────────────────────────────────── */}
             {hoverInfo && !selectedVessel && (
@@ -698,6 +743,8 @@ export default function GlobeViewComponent() {
 
             {/* ── RIGHT SIDE PANELS (one at a time) ─────────── */}
 
+            {!embedMode && (
+            <>
             {/* Piracy incident detail */}
             {selectedPiracy && (
                 <PiracyPanel
@@ -756,6 +803,8 @@ export default function GlobeViewComponent() {
                         setComparedVessel(null)
                     }}
                 />
+            )}
+            </>
             )}
         </div>
     );

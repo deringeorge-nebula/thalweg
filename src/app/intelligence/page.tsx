@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   twitter: { card: 'summary_large_image' }
 }
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,47 +35,46 @@ const INTEL_FEEDS = [
 
 export default async function IntelligencePage() {
   const [
+    { count: totalActive },
+    { count: totalSanctions },
+    { count: totalAnomalies },
+    { count: totalDarkFleet },
+    { count: totalDarkFleet80 },
+    { count: totalDarkFleet90 },
+    { count: positionCount },
     { data: fleetStats },
     { data: sanctionsByFlag },
-    { data: darkFleetByRegion },
     { data: anomalyStats },
-    { data: totals },
-    { count: positionCount },
+    { data: darkFleetAvgData },
   ] = await Promise.all([
-    supabase
-      .from('vessels')
-      .select('type_category, is_active')
-      .eq('is_active', true)
-      .not('type_category', 'is', null),
-
-    supabase
-      .from('vessels')
-      .select('flag_state')
-      .eq('sanctions_match', true)
-      .eq('is_active', true)
-      .not('flag_state', 'is', null),
-
-    supabase
-      .from('vessels')
-      .select('nav_status, dark_fleet_score')
-      .gte('dark_fleet_score', 60)
+    // Counts only — no row data fetched
+    supabase.from('vessels').select('*', { count: 'exact', head: true })
       .eq('is_active', true),
+    supabase.from('vessels').select('*', { count: 'exact', head: true })
+      .eq('is_active', true).eq('sanctions_match', true),
+    supabase.from('vessels').select('*', { count: 'exact', head: true })
+      .eq('is_active', true).eq('is_anomaly', true),
+    supabase.from('vessels').select('*', { count: 'exact', head: true })
+      .eq('is_active', true).gte('dark_fleet_score', 60),
+    supabase.from('vessels').select('*', { count: 'exact', head: true })
+      .eq('is_active', true).gte('dark_fleet_score', 80),
+    supabase.from('vessels').select('*', { count: 'exact', head: true })
+      .eq('is_active', true).gte('dark_fleet_score', 90),
+    supabase.from('vessel_positions').select('*', { count: 'exact', head: true }),
 
-    supabase
-      .from('vessels')
-      .select('anomaly_type')
-      .eq('is_anomaly', true)
-      .eq('is_active', true)
-      .not('anomaly_type', 'is', null),
+    // Small aggregation queries — only the columns needed
+    supabase.from('vessels').select('type_category')
+      .eq('is_active', true).not('type_category', 'is', null).limit(5000),
+    supabase.from('vessels').select('flag_state')
+      .eq('sanctions_match', true).eq('is_active', true)
+      .not('flag_state', 'is', null).limit(2000),
+    supabase.from('vessels').select('anomaly_type')
+      .eq('is_anomaly', true).eq('is_active', true)
+      .not('anomaly_type', 'is', null).limit(2000),
 
-    supabase
-      .from('vessels')
-      .select('mmsi, sanctions_match, is_anomaly, dark_fleet_score')
-      .eq('is_active', true),
-
-    supabase
-      .from('vessel_positions')
-      .select('id, recorded_at', { count: 'exact', head: true }),
+    // Avg dark fleet score — small sample
+    supabase.from('vessels').select('dark_fleet_score')
+      .eq('is_active', true).gte('dark_fleet_score', 60).limit(1000),
   ]);
 
   // Fleet breakdown
@@ -107,22 +106,16 @@ export default async function IntelligencePage() {
   const anomalyEntries = Object.entries(anomalyBreakdown)
     .sort((a, b) => b[1] - a[1]);
 
-  // Totals
-  const totalActive = totals?.length ?? 0;
-  const totalSanctions = totals?.filter(v => v.sanctions_match).length ?? 0;
-  const totalAnomalies = totals?.filter(v => v.is_anomaly).length ?? 0;
-  const totalDarkFleet = totals?.filter(v => (v.dark_fleet_score ?? 0) >= 60).length ?? 0;
-
-  // Dark fleet avg score
-  const darkFleetAvg = darkFleetByRegion && darkFleetByRegion.length > 0
+  // Totals — sourced from server-side count queries (no row fetching)
+  const darkFleetAvg = darkFleetAvgData && darkFleetAvgData.length > 0
     ? Math.round(
-      darkFleetByRegion.reduce((s, v) => s + (v.dark_fleet_score ?? 0), 0)
-      / darkFleetByRegion.length
-    )
+        darkFleetAvgData.reduce((s, v) => s + (v.dark_fleet_score ?? 0), 0)
+        / darkFleetAvgData.length
+      )
     : 0;
 
-  const darkFleetHigh = totals?.filter(v => (v.dark_fleet_score ?? 0) >= 80).length ?? 0;
-  const darkFleetCritical = totals?.filter(v => (v.dark_fleet_score ?? 0) >= 90).length ?? 0;
+  const darkFleetHigh = totalDarkFleet80 ?? 0;
+  const darkFleetCritical = totalDarkFleet90 ?? 0;
 
   return (
     <div className="bg-[#0a0f1e] min-h-screen font-body text-slate-300 pb-16">
@@ -173,19 +166,19 @@ export default async function IntelligencePage() {
       {/* STATS ROW */}
       <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-6xl mx-auto px-6">
         <div className="bg-[#0d1424] border border-[#1a2744] rounded-xl p-6 text-center">
-          <div className="text-white text-4xl font-bold font-data">{totalActive.toLocaleString()}</div>
+          <div className="text-white text-4xl font-bold font-data">{(totalActive ?? 0).toLocaleString()}</div>
           <div className="text-slate-500 text-xs font-data tracking-widest mt-2">ACTIVE VESSELS</div>
         </div>
         <div className="bg-[#0d1424] border border-[#1a2744] rounded-xl p-6 text-center">
-          <div className="text-[#ef4444] text-4xl font-bold font-data">{totalSanctions.toLocaleString()}</div>
+          <div className="text-[#ef4444] text-4xl font-bold font-data">{(totalSanctions ?? 0).toLocaleString()}</div>
           <div className="text-slate-500 text-xs font-data tracking-widest mt-2">SANCTIONS MATCHES</div>
         </div>
         <div className="bg-[#0d1424] border border-[#1a2744] rounded-xl p-6 text-center">
-          <div className="text-[#f97316] text-4xl font-bold font-data">{totalAnomalies.toLocaleString()}</div>
+          <div className="text-[#f97316] text-4xl font-bold font-data">{(totalAnomalies ?? 0).toLocaleString()}</div>
           <div className="text-slate-500 text-xs font-data tracking-widest mt-2">AIS ANOMALIES</div>
         </div>
         <div className="bg-[#0d1424] border border-[#1a2744] rounded-xl p-6 text-center">
-          <div className="text-[#eab308] text-4xl font-bold font-data">{totalDarkFleet.toLocaleString()}</div>
+          <div className="text-[#eab308] text-4xl font-bold font-data">{(totalDarkFleet ?? 0).toLocaleString()}</div>
           <div className="text-slate-500 text-xs font-data tracking-widest mt-2">DARK FLEET (score ≥60)</div>
         </div>
       </div>

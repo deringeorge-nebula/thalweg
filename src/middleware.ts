@@ -42,6 +42,10 @@ export async function middleware(request: NextRequest) {
   }
 
   const response = NextResponse.next()
+  // Allow embedding via iframe
+  response.headers.set('X-Frame-Options', 'ALLOWALL')
+  response.headers.set('Content-Security-Policy',
+    "frame-ancestors *")
 
   // Always attach rate limit headers
   response.headers.set('X-RateLimit-Limit', '60')
