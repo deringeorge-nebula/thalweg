@@ -13,12 +13,20 @@ export default function ApiDocsPage() {
             MARITIME INTELLIGENCE
           </span>
         </div>
-        <Link 
-          href="/" 
-          className="text-[#00d4ff] text-xs font-data hover:underline cursor-pointer"
-        >
-          ← LIVE GLOBE
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link 
+            href="/" 
+            className="text-[#00d4ff] text-xs font-data hover:underline cursor-pointer"
+          >
+            ← LIVE GLOBE
+          </Link>
+          <Link href="/api-docs" className="text-slate-400 text-xs font-data hover:text-[#00d4ff]">
+            API DOCS
+          </Link>
+          <Link href="/intelligence" className="text-slate-400 text-xs font-data hover:text-[#00d4ff]">
+            INTELLIGENCE
+          </Link>
+        </div>
       </header>
 
       {/* HERO */}

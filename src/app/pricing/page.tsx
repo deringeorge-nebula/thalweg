@@ -23,6 +23,9 @@ export default function PricingPage() {
           <Link href="/api-docs" className="text-slate-400 text-xs font-data hover:text-[#00d4ff]">
             API DOCS
           </Link>
+          <Link href="/intelligence" className="text-slate-400 text-xs font-data hover:text-[#00d4ff]">
+            INTELLIGENCE
+          </Link>
         </div>
       </header>
 
