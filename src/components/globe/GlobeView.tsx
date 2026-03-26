@@ -111,6 +111,7 @@ export default function GlobeViewComponent({
     const [selectedPiracy, setSelectedPiracy] = useState<PiracyIncident | null>(null);
     const [spillResult, setSpillResult] = useState<SpillResult | null>(null);
     const [showHeatmap, setShowHeatmap] = useState(false);
+    const [layersOpen, setLayersOpen] = useState(false);
     const { incidents: piracyIncidents, riskZones } = usePiracyData();
 
     const darkFleetVessels = useMemo(
@@ -547,68 +548,41 @@ export default function GlobeViewComponent({
                 }}
             />
 
-            {/* ── Heatmap / Vessels toggle ──────────────────────────────────────── */}
-            {!embedMode && (
-            <button
-                onClick={() => setShowHeatmap(prev => !prev)}
-                className={`
-                    absolute top-14 right-4 z-20
-                    px-3 py-1.5
-                    font-data text-xs tracking-widest
-                    border rounded
-                    transition-colors duration-200
-                    ${showHeatmap
-                        ? 'bg-[#00d4ff] text-[#0a0f1e] border-[#00d4ff]'
-                        : 'bg-transparent text-[#00d4ff] border-[#00d4ff] hover:bg-[#00d4ff]/10'
-                    }
-                `}
-            >
-                {showHeatmap ? 'VESSELS' : 'DENSITY'}
-            </button>
-            )}
-
             {/* ── Top status bar ─────────────────────────────────────────────────── */}
             {!embedMode && (
-            <div className="fixed top-0 left-0 right-0 z-20 bg-[#0a0f1e]/95 backdrop-blur border-b border-[#1a2744] px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2">
-                {/* Row 1 */}
+            <>
+            <div className="fixed top-0 left-0 right-0 z-20 bg-[#0a0f1e]/95 backdrop-blur-sm border-b border-[#1a2744] px-3 sm:px-4 py-2 flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3">
                 <div className="flex items-center gap-3 flex-shrink-0">
-                    <div className="flex items-center gap-3">
-                        <span className="font-heading text-white font-bold text-lg tracking-wide">
-                            THALWEG
-                        </span>
-                        <span className="text-text-muted text-xs font-data hidden sm:block">
-                            MARITIME INTELLIGENCE
-                        </span>
-                    </div>
-
-                    <div className="relative">
-                        <VesselSearchBar
-                            vessels={globeData.vessels}
-                            onVesselSelect={(vessel) => {
-                                setSelectedPort(null)
-                                setSelectedPiracy(null)
-                                setSpillResult(null)
-                                setSelectedVessel(vessel)
-                                trackVesselClick(
-                                    vessel.mmsi,
-                                    vessel.vessel_name ?? 'Unknown',
-                                    vessel.is_anomaly ?? false,
-                                    vessel.sanctions_match ?? false,
-                                    vessel.dark_fleet_score ?? 0
-                                )
-                            }}
-                        />
-                    </div>
+                    <span className="font-heading text-white font-bold text-lg tracking-wide">
+                        THALWEG
+                    </span>
+                    <span className="text-text-muted text-xs font-data hidden sm:block">
+                        MARITIME INTELLIGENCE
+                    </span>
                 </div>
 
-                {/* Row 2 */}
-                <div className="relative w-full sm:w-auto overflow-hidden sm:overflow-visible flex-shrink-0">
-                    {/* Right fade hint */}
-                    <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0a0f1e] to-transparent pointer-events-none z-10 sm:hidden" />
-                    
-                    {/* Toggle buttons */}
-                    <div className="flex items-center font-data text-xs gap-1.5 sm:gap-4 overflow-x-auto sm:overflow-visible scrollbar-none flex-nowrap sm:flex-wrap w-full sm:w-auto pb-1 sm:pb-0">
-                        {/* Live vessel count */}
+                <div className="relative w-32 sm:w-auto flex-shrink-0">
+                    <VesselSearchBar
+                        vessels={globeData.vessels}
+                        onVesselSelect={(vessel) => {
+                            setSelectedPort(null)
+                            setSelectedPiracy(null)
+                            setSpillResult(null)
+                            setSelectedVessel(vessel)
+                            trackVesselClick(
+                                vessel.mmsi,
+                                vessel.vessel_name ?? 'Unknown',
+                                vessel.is_anomaly ?? false,
+                                vessel.sanctions_match ?? false,
+                                vessel.dark_fleet_score ?? 0
+                            )
+                        }}
+                    />
+                </div>
+
+                {/* Vessel count + REALTIME */}
+                <div className="flex items-center gap-4 text-xs font-data hidden md:flex flex-shrink-0">
+                    {/* Live vessel count */}
                     <div className="flex items-center gap-1.5">
                         <div
                             className={`w-2 h-2 rounded-full ${isLoading ? 'bg-alert-warning' : 'bg-alert-ok'}`}
@@ -644,7 +618,10 @@ export default function GlobeViewComponent({
                             {dataFreshness.toLocaleTimeString('en-GB', { hour12: false })} UTC
                         </span>
                     )}
+                </div>
 
+                {/* DESKTOP ONLY toggle buttons */}
+                <div className="hidden sm:flex items-center gap-2 md:gap-2 ml-auto">
                     <button
                         onClick={() => setIsRouteMode(!isRouteMode)}
                         className={`
@@ -691,9 +668,157 @@ export default function GlobeViewComponent({
                     >
                         PIRACY
                     </button>
-                    </div>
+                    {/* DENSITY button */}
+                    <button
+                        onClick={() => setShowHeatmap(!showHeatmap)}
+                        className={`font-data font-medium border transition-all touch-manipulation min-h-[36px] sm:min-h-0 rounded px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0 ${showHeatmap
+                            ? 'bg-[#8b5cf6]/20 border-[#8b5cf6] text-[#8b5cf6]'
+                            : 'bg-navy-950/40 border-gray-600 text-gray-400 hover:border-gray-400'
+                            }`}
+                    >
+                        DENSITY
+                    </button>
                 </div>
+
+                {/* MOBILE ONLY layers button */}
+                <button
+                    onClick={() => setLayersOpen(true)}
+                    className="flex sm:hidden items-center gap-1.5 ml-auto px-3 py-1.5 rounded border border-[#1a2744] bg-[#0d1424] hover:border-[#00d4ff] text-slate-300 text-[11px] font-data tracking-widest transition-colors touch-manipulation flex-shrink-0"
+                >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0">
+                        <rect x="0" y="2" width="14" height="1.5" rx="0.75" fill="currentColor"/>
+                        <rect x="0" y="6.25" width="14" height="1.5" rx="0.75" fill="currentColor"/>
+                        <rect x="0" y="10.5" width="14" height="1.5" rx="0.75" fill="currentColor"/>
+                    </svg>
+                    LAYERS
+                </button>
             </div>
+
+            {/* MOBILE LAYERS DRAWER */}
+            {layersOpen && (
+              <>
+                {/* Backdrop */}
+                <div 
+                  className="fixed inset-0 z-40 bg-black/60 sm:hidden"
+                  onClick={() => setLayersOpen(false)}
+                />
+                
+                {/* Drawer */}
+                <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-[#0a0f1e] border-t-2 border-[#00d4ff] rounded-t-2xl pb-safe">
+                  
+                  {/* Handle bar */}
+                  <div className="flex justify-center pt-3 pb-1">
+                    <div className="w-10 h-1 bg-[#1a2744] rounded-full" />
+                  </div>
+
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-5 py-3 border-b border-[#1a2744]">
+                    <span className="text-[#00d4ff] text-xs font-data tracking-widest">
+                      MAP LAYERS
+                    </span>
+                    <button 
+                      onClick={() => setLayersOpen(false)}
+                      className="text-slate-500 text-xs font-data hover:text-white touch-manipulation px-2 py-1">
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Layer rows */}
+                  <div className="px-4 py-3 space-y-1">
+
+                    {/* ROUTE */}
+                    <button
+                      onClick={() => setIsRouteMode(!isRouteMode)}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${isRouteMode
+                          ? 'border-[#00d4ff] bg-[#00d4ff]/10 text-[#00d4ff]'
+                          : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
+                        }`}
+                    >
+                      <span>ROUTE BUILDER</span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${isRouteMode 
+                          ? 'bg-[#00d4ff]/20 text-[#00d4ff]' 
+                          : 'bg-[#1a2744] text-slate-600'}`}>
+                        {isRouteMode ? 'ON' : 'OFF'}
+                      </span>
+                    </button>
+
+                    {/* SST */}
+                    <button
+                      onClick={() => setSstVisible(!sstVisible)} 
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${sstVisible
+                          ? 'border-[#06b6d4] bg-[#06b6d4]/10 text-[#06b6d4]'
+                          : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
+                        }`}
+                    >
+                      <span>SEA SURFACE TEMP</span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${sstVisible 
+                          ? 'bg-[#06b6d4]/20 text-[#06b6d4]' 
+                          : 'bg-[#1a2744] text-slate-600'}`}>
+                        {sstVisible ? 'ON' : 'OFF'}
+                      </span>
+                    </button>
+
+                    {/* DARK FLEET */}
+                    <button
+                      onClick={() => setDarkFleetVisible(!darkFleetVisible)}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${darkFleetVisible
+                          ? 'border-[#ef4444] bg-[#ef4444]/10 text-[#ef4444]'
+                          : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
+                        }`}
+                    >
+                      <span>DARK FLEET</span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${darkFleetVisible 
+                          ? 'bg-[#ef4444]/20 text-[#ef4444]' 
+                          : 'bg-[#1a2744] text-slate-600'}`}>
+                        {darkFleetVisible ? 'ON' : 'OFF'}
+                      </span>
+                    </button>
+
+                    {/* PIRACY */}
+                    <button
+                      onClick={() => setShowPiracy(!showPiracy)}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${showPiracy
+                          ? 'border-[#f97316] bg-[#f97316]/10 text-[#f97316]'
+                          : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
+                        }`}
+                    >
+                      <span>PIRACY ZONES</span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${showPiracy 
+                          ? 'bg-[#f97316]/20 text-[#f97316]' 
+                          : 'bg-[#1a2744] text-slate-600'}`}>
+                        {showPiracy ? 'ON' : 'OFF'}
+                      </span>
+                    </button>
+
+                    {/* DENSITY */}
+                    <button
+                      onClick={() => setShowHeatmap(!showHeatmap)}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${showHeatmap
+                          ? 'border-[#8b5cf6] bg-[#8b5cf6]/10 text-[#8b5cf6]'
+                          : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
+                        }`}
+                    >
+                      <span>VESSEL DENSITY</span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${showHeatmap 
+                          ? 'bg-[#8b5cf6]/20 text-[#8b5cf6]' 
+                          : 'bg-[#1a2744] text-slate-600'}`}>
+                        {showHeatmap ? 'ON' : 'OFF'}
+                      </span>
+                    </button>
+
+                  </div>
+
+                  {/* Active count footer */}
+                  <div className="px-5 py-3 border-t border-[#1a2744]">
+                    <span className="text-slate-600 text-[10px] font-data tracking-widest">
+                      {[isRouteMode, sstVisible, darkFleetVisible, showPiracy, showHeatmap].filter(Boolean).length} LAYER(S) ACTIVE
+                    </span>
+                  </div>
+
+                </div>
+              </>
+            )}
+            </>
             )}
 
             {/* ── Vessel type legend ─────────────────────────────────────────────── */}
