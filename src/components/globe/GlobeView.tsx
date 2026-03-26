@@ -144,53 +144,105 @@ export default function GlobeViewComponent({
     // triggers exactly ONE setState per 500ms regardless of vessel update volume.
     useEffect(() => {
         const interval = setInterval(() => {
-            if (isDemoMode) return;
-            let vessels = Array.from(vesselMapRef.current.values()).filter(
-                (v) => v.lat !== null && v.lon !== null
-            );
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(() => {
+                    if (isDemoMode) return;
+                    let vessels = Array.from(vesselMapRef.current.values()).filter(
+                        (v) => v.lat !== null && v.lon !== null
+                    );
 
-            if (embedMode && embedFilter) {
-                switch (embedFilter) {
-                    case 'sanctioned':
-                        vessels = vessels.filter(v => v.sanctions_match);
-                        break;
-                    case 'darkfleet':
-                        vessels = vessels.filter(v => (v.dark_fleet_score ?? 0) >= 60);
-                        break;
-                    case 'tanker':
-                        vessels = vessels.filter(v => v.type_category === 'Tanker');
-                        break;
-                    case 'cargo':
-                        vessels = vessels.filter(v => v.type_category === 'Cargo');
-                        break;
+                    if (embedMode && embedFilter) {
+                        switch (embedFilter) {
+                            case 'sanctioned':
+                                vessels = vessels.filter(v => v.sanctions_match);
+                                break;
+                            case 'darkfleet':
+                                vessels = vessels.filter(v => (v.dark_fleet_score ?? 0) >= 60);
+                                break;
+                            case 'tanker':
+                                vessels = vessels.filter(v => v.type_category === 'Tanker');
+                                break;
+                            case 'cargo':
+                                vessels = vessels.filter(v => v.type_category === 'Cargo');
+                                break;
+                        }
+                    }
+
+                    if (vessels.length === 0) return;
+
+                    const count = vessels.length;
+                    const positions = new Float32Array(count * 2);
+                    const colors = new Uint8Array(count * 4);
+
+                    for (let i = 0; i < count; i++) {
+                        const v = vessels[i];
+                        // deck.gl is ALWAYS [longitude, latitude] — not lat/lon
+                        positions[i * 2] = v.lon;
+                        positions[i * 2 + 1] = v.lat;
+
+                        const rgb = hexToRgb(v.type_color || '#7F8C8D');
+                        // Sanctions = red override; anomaly = yellow override
+                        const r = v.sanctions_match ? 255 : v.is_anomaly ? 255 : rgb[0];
+                        const g = v.sanctions_match ? 68 : v.is_anomaly ? 184 : rgb[1];
+                        const b = v.sanctions_match ? 68 : v.is_anomaly ? 0 : rgb[2];
+
+                        colors[i * 4] = r;
+                        colors[i * 4 + 1] = g;
+                        colors[i * 4 + 2] = b;
+                        colors[i * 4 + 3] = v.is_anomaly || v.sanctions_match ? 255 : 210;
+                    }
+
+                    setGlobeData({ positions, colors, vessels, count });
+                }, { timeout: 2000 });
+            } else {
+                if (isDemoMode) return;
+                let vessels = Array.from(vesselMapRef.current.values()).filter(
+                    (v) => v.lat !== null && v.lon !== null
+                );
+
+                if (embedMode && embedFilter) {
+                    switch (embedFilter) {
+                        case 'sanctioned':
+                            vessels = vessels.filter(v => v.sanctions_match);
+                            break;
+                        case 'darkfleet':
+                            vessels = vessels.filter(v => (v.dark_fleet_score ?? 0) >= 60);
+                            break;
+                        case 'tanker':
+                            vessels = vessels.filter(v => v.type_category === 'Tanker');
+                            break;
+                        case 'cargo':
+                            vessels = vessels.filter(v => v.type_category === 'Cargo');
+                            break;
+                    }
                 }
+
+                if (vessels.length === 0) return;
+
+                const count = vessels.length;
+                const positions = new Float32Array(count * 2);
+                const colors = new Uint8Array(count * 4);
+
+                for (let i = 0; i < count; i++) {
+                    const v = vessels[i];
+                    // deck.gl is ALWAYS [longitude, latitude] — not lat/lon
+                    positions[i * 2] = v.lon;
+                    positions[i * 2 + 1] = v.lat;
+
+                    const rgb = hexToRgb(v.type_color || '#7F8C8D');
+                    // Sanctions = red override; anomaly = yellow override
+                    const r = v.sanctions_match ? 255 : v.is_anomaly ? 255 : rgb[0];
+                    const g = v.sanctions_match ? 68 : v.is_anomaly ? 184 : rgb[1];
+                    const b = v.sanctions_match ? 68 : v.is_anomaly ? 0 : rgb[2];
+
+                    colors[i * 4] = r;
+                    colors[i * 4 + 1] = g;
+                    colors[i * 4 + 2] = b;
+                    colors[i * 4 + 3] = v.is_anomaly || v.sanctions_match ? 255 : 210;
+                }
+
+                setGlobeData({ positions, colors, vessels, count });
             }
-
-            if (vessels.length === 0) return;
-
-            const count = vessels.length;
-            const positions = new Float32Array(count * 2);
-            const colors = new Uint8Array(count * 4);
-
-            for (let i = 0; i < count; i++) {
-                const v = vessels[i];
-                // deck.gl is ALWAYS [longitude, latitude] — not lat/lon
-                positions[i * 2] = v.lon;
-                positions[i * 2 + 1] = v.lat;
-
-                const rgb = hexToRgb(v.type_color || '#7F8C8D');
-                // Sanctions = red override; anomaly = yellow override
-                const r = v.sanctions_match ? 255 : v.is_anomaly ? 255 : rgb[0];
-                const g = v.sanctions_match ? 68 : v.is_anomaly ? 184 : rgb[1];
-                const b = v.sanctions_match ? 68 : v.is_anomaly ? 0 : rgb[2];
-
-                colors[i * 4] = r;
-                colors[i * 4 + 1] = g;
-                colors[i * 4 + 2] = b;
-                colors[i * 4 + 3] = v.is_anomaly || v.sanctions_match ? 255 : 210;
-            }
-
-            setGlobeData({ positions, colors, vessels, count });
         }, 500);
 
         return () => clearInterval(interval);

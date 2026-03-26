@@ -1,5 +1,5 @@
 // src/app/layout.tsx
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Space_Grotesk, Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/react';
@@ -56,6 +56,12 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#0a0f1e',
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -66,6 +72,11 @@ export default function RootLayout({
       lang="en"
       className={`${spaceGrotesk.variable} ${inter.variable} ${jetbrainsMono.variable}`}
     >
+      <head>
+        <link rel="preconnect" href="https://sicutrxeipyqvluzpuvb.supabase.co" />
+        <link rel="dns-prefetch" href="https://sicutrxeipyqvluzpuvb.supabase.co" />
+        <link rel="preconnect" href="https://unpkg.com" />
+      </head>
       <body className="bg-ocean-base text-white antialiased">
         {children}
         <Analytics />
