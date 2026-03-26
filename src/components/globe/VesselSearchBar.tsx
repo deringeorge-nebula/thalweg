@@ -60,11 +60,11 @@ export function VesselSearchBar({ vessels, onVesselSelect }: VesselSearchBarProp
             inputRef.current?.blur()
           }
         }}
-        className="w-48 focus:w-64 transition-all duration-200 bg-[#0d1424] border border-[#1a2744] rounded px-3 py-1 text-white font-data text-xs focus:outline-none focus:border-[#00d4ff] placeholder:text-slate-500"
+        className="w-36 sm:w-48 md:w-56 focus:w-64 transition-all duration-200 bg-[#0d1424] border border-[#1a2744] rounded px-3 py-1 text-white font-data text-xs focus:outline-none focus:border-[#00d4ff] placeholder:text-slate-500"
       />
 
       <span className="absolute right-3 text-slate-600 text-[10px] font-data pointer-events-none">
-        ⌘K
+        <span className="hidden sm:inline">⌘K</span>
       </span>
 
       {/* RESULTS DROPDOWN */}

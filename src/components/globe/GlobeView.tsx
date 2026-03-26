@@ -134,7 +134,7 @@ export default function GlobeViewComponent({
         longitude: initialLon ?? 75,
         latitude: initialLat ?? 15,
         zoom: initialZoom ?? 1.8,
-        pitch: embedMode ? 0 : 45,
+        pitch: embedMode ? 0 : (typeof window !== 'undefined' && window.innerWidth < 640 ? 20 : 45),
         bearing: 0,
     };
 
@@ -569,36 +569,40 @@ export default function GlobeViewComponent({
 
             {/* ── Top status bar ─────────────────────────────────────────────────── */}
             {!embedMode && (
-            <div className="absolute top-0 left-0 right-0 flex flex-wrap items-center justify-between px-3 sm:px-4 py-2 glass-panel border-b border-glow z-10 transition-all duration-200">
-                <div className="flex items-center gap-3">
-                    <span className="font-heading text-white font-bold text-lg tracking-wide">
-                        THALWEG
-                    </span>
-                    <span className="text-text-muted text-xs font-data">
-                        MARITIME INTELLIGENCE
-                    </span>
+            <div className="fixed top-0 left-0 right-0 z-20 bg-[#0a0f1e]/95 backdrop-blur border-b border-[#1a2744] px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2">
+                {/* Row 1 */}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-3">
+                        <span className="font-heading text-white font-bold text-lg tracking-wide">
+                            THALWEG
+                        </span>
+                        <span className="text-text-muted text-xs font-data">
+                            MARITIME INTELLIGENCE
+                        </span>
+                    </div>
+
+                    <div className="relative">
+                        <VesselSearchBar
+                            vessels={globeData.vessels}
+                            onVesselSelect={(vessel) => {
+                                setSelectedPort(null)
+                                setSelectedPiracy(null)
+                                setSpillResult(null)
+                                setSelectedVessel(vessel)
+                                trackVesselClick(
+                                    vessel.mmsi,
+                                    vessel.vessel_name ?? 'Unknown',
+                                    vessel.is_anomaly ?? false,
+                                    vessel.sanctions_match ?? false,
+                                    vessel.dark_fleet_score ?? 0
+                                )
+                            }}
+                        />
+                    </div>
                 </div>
 
-                <div className="relative">
-                    <VesselSearchBar
-                        vessels={globeData.vessels}
-                        onVesselSelect={(vessel) => {
-                            setSelectedPort(null)
-                            setSelectedPiracy(null)
-                            setSpillResult(null)
-                            setSelectedVessel(vessel)
-                            trackVesselClick(
-                                vessel.mmsi,
-                                vessel.vessel_name ?? 'Unknown',
-                                vessel.is_anomaly ?? false,
-                                vessel.sanctions_match ?? false,
-                                vessel.dark_fleet_score ?? 0
-                            )
-                        }}
-                    />
-                </div>
-
-                <div className="flex items-center gap-2 sm:gap-4 text-xs font-data overflow-x-auto sm:overflow-x-visible flex-nowrap sm:flex-wrap -mx-1 px-1 sm:mx-0 sm:px-0 pb-0.5 sm:pb-0">
+                {/* Row 2 */}
+                <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-0.5 flex-nowrap max-w-full">
                     {/* Live vessel count */}
                     <div className="flex items-center gap-1.5">
                         <div
@@ -639,7 +643,7 @@ export default function GlobeViewComponent({
                     <button
                         onClick={() => setIsRouteMode(!isRouteMode)}
                         className={`
-                            text-xs font-data px-2 py-0.5 min-h-[36px] sm:min-h-0 rounded border transition-colors touch-manipulation flex-shrink-0
+                            font-data min-h-[36px] sm:min-h-0 rounded border transition-colors touch-manipulation px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0
                             ${isRouteMode
                                 ? 'border-[#00d4ff] bg-[#00d4ff]/20 text-[#00d4ff]'
                                 : 'border-text-muted text-text-muted hover:border-[#00d4ff] hover:text-[#00d4ff]'
@@ -656,7 +660,7 @@ export default function GlobeViewComponent({
 
                     <button
                         onClick={() => setSstVisible((v) => !v)}
-                        className={`text-xs font-data px-2 py-0.5 min-h-[36px] sm:min-h-0 rounded border transition-colors touch-manipulation flex-shrink-0 ${sstVisible
+                        className={`font-data min-h-[36px] sm:min-h-0 rounded border transition-colors touch-manipulation px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0 ${sstVisible
                             ? 'border-accent-cyan text-accent-cyan'
                             : 'border-text-muted text-text-muted'
                             }`}
@@ -665,7 +669,7 @@ export default function GlobeViewComponent({
                     </button>
                     <button
                         onClick={() => setDarkFleetVisible((v) => !v)}
-                        className={`text-xs font-data px-2 py-0.5 min-h-[36px] sm:min-h-0 rounded border transition-colors touch-manipulation flex-shrink-0 ${darkFleetVisible
+                        className={`font-data min-h-[36px] sm:min-h-0 rounded border transition-colors touch-manipulation px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0 ${darkFleetVisible
                             ? 'border-alert-critical text-alert-critical'
                             : 'border-text-muted text-text-muted'
                             }`}
@@ -675,7 +679,7 @@ export default function GlobeViewComponent({
                     {/* PIRACY button */}
                     <button
                         onClick={() => setShowPiracy(p => !p)}
-                        className={`px-3 py-1 min-h-[36px] sm:min-h-0 rounded text-xs font-data font-medium border transition-all touch-manipulation flex-shrink-0 ${showPiracy
+                        className={`font-data font-medium border transition-all touch-manipulation min-h-[36px] sm:min-h-0 rounded px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0 ${showPiracy
                             ? 'bg-red-900/40 border-red-500 text-red-400'
                             : 'bg-navy-950/40 border-gray-600 text-gray-400 hover:border-gray-400'
                             }`}
@@ -688,7 +692,7 @@ export default function GlobeViewComponent({
 
             {/* ── Vessel type legend ─────────────────────────────────────────────── */}
             {!embedMode && (
-            <div className="absolute bottom-6 left-4 glass-panel p-3 rounded z-10">
+            <div className="absolute bottom-6 left-4 glass-panel rounded z-10 text-[9px] sm:text-[10px] p-2 sm:p-3 max-w-[140px] sm:max-w-none">
                 <div className="text-text-muted text-xs font-data mb-2 uppercase tracking-widest">
                     Vessel Types
                 </div>
@@ -700,7 +704,7 @@ export default function GlobeViewComponent({
                     { label: 'High Speed', color: '#F39C12' },
                     { label: 'Unknown', color: '#7F8C8D' },
                 ].map(({ label, color }) => (
-                    <div key={label} className="flex items-center gap-2 mb-1">
+                    <div key={label} className="flex items-center mb-1 gap-1 sm:gap-1.5 py-0.5">
                         <div
                             className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                             style={{ backgroundColor: color, boxShadow: `0 0 4px ${color}` }}
@@ -710,11 +714,11 @@ export default function GlobeViewComponent({
                 ))}
                 {/* Alert indicators */}
                 <div className="border-t border-glow mt-2 pt-2">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center mb-1 gap-1 sm:gap-1.5 py-0.5">
                         <div className="w-2.5 h-2.5 rounded-full bg-alert-critical" style={{ boxShadow: '0 0 4px #FF4444' }} />
                         <span className="text-alert-critical text-xs font-body">Sanctions Match</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 sm:gap-1.5 py-0.5">
                         <div className="w-2.5 h-2.5 rounded-full bg-alert-warning" style={{ boxShadow: '0 0 4px #FFB800' }} />
                         <span className="text-alert-warning text-xs font-body">Anomaly Detected</span>
                     </div>
