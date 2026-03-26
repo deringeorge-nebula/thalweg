@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   description: '29,547 live vessels. Sanctions screening. Dark fleet detection. Port congestion forecasts. Free, open-source maritime intelligence built on public data.',
   metadataBase: new URL('https://thalweg.vercel.app'),
   verification: {
-    google: 'googlea7d6695320c7dad5',
+    google: '6rNpTwRxnyMhQadWxX8uUYxiZfw6rBt68c2BsqR-_1M',
   },
   openGraph: {
     title: 'Thalweg - Free Maritime Intelligence',
