@@ -1,5 +1,19 @@
 import Link from 'next/link';
 
+import type { Metadata } from 'next'
+export const metadata: Metadata = {
+  title: 'Pricing - Thalweg Maritime Intelligence',
+  description: 'Free for public use. Researcher and enterprise tiers for institutional operators. Real-time maritime intelligence platform.',
+  openGraph: {
+    title: 'Thalweg Pricing',
+    description: 'Maritime intelligence from free to enterprise. 40K+ live vessels, dark fleet detection, sanctions screening.',
+    url: 'https://thalweg.vercel.app/pricing',
+    siteName: 'Thalweg',
+    images: [{ url: 'https://thalweg.vercel.app/opengraph-image' }],
+  },
+  twitter: { card: 'summary_large_image' }
+}
+
 export default function PricingPage() {
   return (
     <div className="bg-[#0a0f1e] min-h-screen font-body text-slate-300 pb-16">
@@ -14,8 +28,8 @@ export default function PricingPage() {
           </span>
         </div>
         <div className="flex items-center gap-6">
-          <Link 
-            href="/" 
+          <Link
+            href="/"
             className="text-[#00d4ff] text-xs font-data hover:underline cursor-pointer"
           >
             ← LIVE GLOBE
@@ -46,15 +60,15 @@ export default function PricingPage() {
 
       {/* PRICING CARDS */}
       <section className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto px-6">
-        
+
         {/* CARD 1 — PUBLIC */}
         <div className="bg-[#0d1424] border border-[#1a2744] rounded-xl p-8 flex flex-col">
           <h2 className="text-slate-400 text-xs font-data tracking-widest">PUBLIC</h2>
           <div className="text-5xl font-bold text-white font-data mt-2">FREE</div>
           <p className="text-slate-500 text-sm mt-1">forever</p>
-          
+
           <div className="border-t border-[#1a2744] my-6"></div>
-          
+
           <ul className="space-y-3 flex-grow">
             {[
               "Live 3D vessel globe (40,000+ vessels)",
@@ -72,9 +86,9 @@ export default function PricingPage() {
               </li>
             ))}
           </ul>
-          
-          <Link 
-            href="/" 
+
+          <Link
+            href="/"
             className="w-full mt-8 py-3 rounded border border-[#00d4ff]/30 text-[#00d4ff] text-sm font-data text-center hover:bg-[#00d4ff]/10 transition-colors block"
           >
             OPEN GLOBE →
@@ -86,13 +100,13 @@ export default function PricingPage() {
           <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#00d4ff] text-[#0a0f1e] text-[10px] font-data font-bold px-3 py-1 rounded-full tracking-widest whitespace-nowrap">
             MOST REQUESTED
           </div>
-          
+
           <h2 className="text-[#00d4ff] text-xs font-data tracking-widest">RESEARCHER / NGO</h2>
           <div className="text-5xl font-bold text-white font-data mt-2">$0</div>
           <p className="text-slate-500 text-sm mt-1">apply for access</p>
-          
+
           <div className="border-t border-[#1a2744] my-6"></div>
-          
+
           <ul className="space-y-3 flex-grow">
             {[
               "Everything in Public",
@@ -109,9 +123,9 @@ export default function PricingPage() {
               </li>
             ))}
           </ul>
-          
-          <Link 
-            href="/demo" 
+
+          <Link
+            href="/demo"
             className="w-full mt-8 py-3 rounded bg-[#00d4ff] text-[#0a0f1e] text-sm font-data font-bold text-center hover:bg-[#00d4ff]/80 transition-colors block"
           >
             REQUEST ACCESS →
@@ -123,9 +137,9 @@ export default function PricingPage() {
           <h2 className="text-slate-400 text-xs font-data tracking-widest">ENTERPRISE</h2>
           <div className="text-5xl font-bold text-white font-data mt-2">CONTACT</div>
           <p className="text-slate-500 text-sm mt-1">custom pricing</p>
-          
+
           <div className="border-t border-[#1a2744] my-6"></div>
-          
+
           <ul className="space-y-3 flex-grow">
             {[
               "Everything in Researcher",
@@ -143,9 +157,9 @@ export default function PricingPage() {
               </li>
             ))}
           </ul>
-          
-          <Link 
-            href="/demo" 
+
+          <Link
+            href="/demo"
             className="w-full mt-8 py-3 rounded border border-[#1a2744] text-slate-300 text-sm font-data text-center hover:border-[#00d4ff] hover:text-[#00d4ff] transition-colors block"
           >
             SCHEDULE DEMO →
@@ -157,7 +171,7 @@ export default function PricingPage() {
       {/* BOTTOM SECTION */}
       <section className="mt-24 text-center px-6">
         <h3 className="text-slate-500 text-xs font-data tracking-widest mb-8">USED FOR</h3>
-        
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
           {[
             "Port Authority Operations",
@@ -181,10 +195,10 @@ export default function PricingPage() {
           <p className="text-slate-400 text-sm">
             Thalweg is AGPL-3.0 licensed. The full source is available on GitHub. Self-hosting is permitted and encouraged — the tiers above reflect hosted service access and support, not the software itself.
           </p>
-          <a 
-            href="https://github.com/deringeorge-nebula/thalweg" 
-            target="_blank" 
-            rel="noopener noreferrer" 
+          <a
+            href="https://github.com/deringeorge-nebula/thalweg"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-block mt-3 text-[#00d4ff] text-xs font-data hover:underline"
           >
             View source on GitHub →

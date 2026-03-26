@@ -1,5 +1,19 @@
 import Link from 'next/link';
 
+import type { Metadata } from 'next'
+export const metadata: Metadata = {
+  title: 'API Reference - Thalweg Maritime Intelligence',
+  description: 'REST API documentation for vessel intelligence, port congestion forecasts, and route risk analysis. 60 req/min public, 600 req/min researcher.',
+  openGraph: {
+    title: 'Thalweg API Reference',
+    description: 'REST API for 40K+ live vessels, sanctions screening, dark fleet detection, and 72h port congestion forecasts.',
+    url: 'https://thalweg.vercel.app/api-docs',
+    siteName: 'Thalweg',
+    images: [{ url: 'https://thalweg.vercel.app/opengraph-image' }],
+  },
+  twitter: { card: 'summary_large_image' }
+}
+
 export default function ApiDocsPage() {
   return (
     <div className="bg-[#0a0f1e] min-h-screen font-body text-slate-300 pb-16">
@@ -14,8 +28,8 @@ export default function ApiDocsPage() {
           </span>
         </div>
         <div className="flex items-center gap-6">
-          <Link 
-            href="/" 
+          <Link
+            href="/"
             className="text-[#00d4ff] text-xs font-data hover:underline cursor-pointer"
           >
             ← LIVE GLOBE
@@ -48,7 +62,7 @@ export default function ApiDocsPage() {
 
       {/* CONTENT */}
       <div className="max-w-4xl mx-auto px-6 pb-24 space-y-16">
-        
+
         {/* ENDPOINT 1 */}
         <section>
           <div className="flex items-center gap-3 mb-4">
@@ -314,16 +328,16 @@ export default function ApiDocsPage() {
             Need higher rate limits or bulk data access?
           </p>
           <div className="flex justify-center gap-4 mt-6">
-            <Link 
-              href="/demo" 
+            <Link
+              href="/demo"
               className="bg-[#00d4ff] text-[#0a0f1e] px-6 py-3 rounded font-data font-bold text-sm hover:bg-[#00d4ff]/80 transition-colors"
             >
               REQUEST RESEARCHER ACCESS →
             </Link>
-            <a 
-              href="https://github.com/deringeorge-nebula/thalweg" 
-              target="_blank" 
-              rel="noopener noreferrer" 
+            <a
+              href="https://github.com/deringeorge-nebula/thalweg"
+              target="_blank"
+              rel="noopener noreferrer"
               className="border border-[#1a2744] text-slate-300 px-6 py-3 rounded font-data text-sm hover:border-[#00d4ff] transition-colors"
             >
               VIEW SOURCE ON GITHUB →

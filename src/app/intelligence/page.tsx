@@ -1,6 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 
+import type { Metadata } from 'next'
+export const metadata: Metadata = {
+  title: 'Fleet Intelligence - Thalweg Maritime Intelligence',
+  description: 'Live global fleet statistics. Sanctions by flag state, dark fleet scoring, AIS anomaly breakdown, and 344K+ position history records.',
+  openGraph: {
+    title: 'Thalweg Fleet Intelligence',
+    description: 'Live maritime intelligence aggregates — sanctions, dark fleet, anomalies, 40K+ active vessels.',
+    url: 'https://thalweg.vercel.app/intelligence',
+    siteName: 'Thalweg',
+    images: [{ url: 'https://thalweg.vercel.app/intelligence/opengraph-image' }],
+  },
+  twitter: { card: 'summary_large_image' }
+}
+
 export const revalidate = 60;
 
 const supabase = createClient(
@@ -102,9 +116,9 @@ export default async function IntelligencePage() {
   // Dark fleet avg score
   const darkFleetAvg = darkFleetByRegion && darkFleetByRegion.length > 0
     ? Math.round(
-        darkFleetByRegion.reduce((s, v) => s + (v.dark_fleet_score ?? 0), 0)
-        / darkFleetByRegion.length
-      )
+      darkFleetByRegion.reduce((s, v) => s + (v.dark_fleet_score ?? 0), 0)
+      / darkFleetByRegion.length
+    )
     : 0;
 
   const darkFleetHigh = totals?.filter(v => (v.dark_fleet_score ?? 0) >= 80).length ?? 0;
