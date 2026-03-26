@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { VesselRow } from '@/types/vessel';
 
@@ -13,7 +13,7 @@ const POLLING_INTERVAL_MS = 30_000;
 const INITIAL_FETCH_LIMIT = 50_000;
 
 export function useVesselStream() {
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
     const vesselMapRef = useRef<Map<string, VesselRow>>(new Map());
     const realtimeActiveRef = useRef(false);
     const [totalCount, setTotalCount] = useState(0);
@@ -23,40 +23,19 @@ export function useVesselStream() {
     // ── Initial bulk fetch ─────────────────────────────────────────────────────
     useEffect(() => {
         async function initialLoad() {
-            let page = 0
-            const pageSize = 10000
-            let hasMore = true
+            const { data, error } = await supabase
+                .from('vessels')
+                .select('mmsi, lat, lon, sog, cog, vessel_type, name, flag')
+                .eq('is_active', true)
+                .not('lat', 'is', null)
+                .limit(500)
+                .order('updated_at', { ascending: false });
 
-            while (hasMore) {
-                const { data, error } = await supabase
-                    .from('vessels')
-                    .select(`mmsi, vessel_name, type_category, type_color,
-                 lat, lon, sog, cog, nav_status, is_active,
-                 is_anomaly, anomaly_type, sanctions_match, 
-                 dark_fleet_score, last_update`)
-                    .eq('is_active', true)
-                    .not('lat', 'is', null)
-                    .range(page * pageSize, (page + 1) * pageSize - 1)
-                    .order('last_update', { ascending: false })
-
-                if (error || !data || data.length === 0) {
-                    hasMore = false
-                    break
-                }
-
+            if (!error && data) {
                 // Merge into vesselMapRef
-                for (const vessel of data) {
+                for (const vessel of data as any[]) {
                     vesselMapRef.current.set(vessel.mmsi, vessel as any)
                 }
-
-                if (data.length < pageSize) {
-                    hasMore = false
-                } else {
-                    page++
-                }
-
-                // Safety cap: max 5 pages = 50,000 vessels
-                if (page >= 5) hasMore = false
             }
 
             setTotalCount(vesselMapRef.current.size);
@@ -65,8 +44,7 @@ export function useVesselStream() {
         }
 
         initialLoad()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [supabase]);
 
     // ── Supabase Realtime subscription ───────────────────────────────────────
     useEffect(() => {
@@ -106,7 +84,7 @@ export function useVesselStream() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, []);
+    }, [supabase]);
 
     // ── 30-second REST polling fallback ────────────────────────────────────────
     // Activates automatically when Realtime is not working.
@@ -137,7 +115,7 @@ export function useVesselStream() {
 
         const interval = setInterval(poll, POLLING_INTERVAL_MS);
         return () => clearInterval(interval);
-    }, []);
+    }, [supabase]);
 
     return {
         vesselMapRef,

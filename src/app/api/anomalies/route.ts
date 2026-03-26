@@ -71,7 +71,7 @@ export async function GET(request: Request) {
   // 2. Data Query (with filters, sort, limit, offset)
   let dataQuery = supabase
     .from('anomalies')
-    .select('*')
+    .select('mmsi, lat, lon, sog, cog, vessel_type, name, flag, nav_status, updated_at')
     .eq('resolved', false)
     .eq('false_positive', false)
 

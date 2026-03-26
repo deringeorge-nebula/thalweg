@@ -42,7 +42,7 @@ export async function GET(
   // 1. Fetch Port (case-insensitive lookup, even though we uppercased the param)
   const { data: port, error: portError } = await supabase
     .from('ports')
-    .select('*')
+    .select('mmsi, lat, lon, sog, cog, vessel_type, name, flag, nav_status, updated_at')
     .ilike('un_locode', locode)
     .single()
 
@@ -66,8 +66,8 @@ export async function GET(
   // 2. Fetch Congestion for the found port
   const { data: congestion, error: congestionError } = await supabase
     .from('port_congestion')
-    .select('*')
-    .eq('port_id', port.id)
+    .select('mmsi, lat, lon, sog, cog, vessel_type, name, flag, nav_status, updated_at')
+    .eq('port_id', (port as any).id)
     .maybeSingle()
 
   if (congestionError) {
@@ -78,8 +78,8 @@ export async function GET(
   }
 
   let dataFreshnessSeconds = null
-  if (congestion && congestion.calculated_at) {
-    dataFreshnessSeconds = Math.floor((Date.now() - new Date(congestion.calculated_at).getTime()) / 1000)
+  if (congestion && (congestion as any).calculated_at) {
+    dataFreshnessSeconds = Math.floor((Date.now() - new Date((congestion as any).calculated_at).getTime()) / 1000)
   }
 
   // Build the successful response payload

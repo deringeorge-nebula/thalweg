@@ -53,7 +53,7 @@ Deno.serve(async (req: Request) => {
             // 1. Fetch vessel data
             const { data: vessel } = await supabase
                 .from("vessels")
-                .select("*")
+                .select("mmsi, lat, lon, sog, cog, vessel_type, name, flag, nav_status, updated_at")
                 .eq("mmsi", mmsi)
                 .single();
 

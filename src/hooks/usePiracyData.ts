@@ -64,11 +64,11 @@ export default function usePiracyData(): PiracyData {
         const [incidentsResponse, riskZonesResponse] = await Promise.all([
           supabase
             .from('piracy_incidents')
-            .select('*')
+            .select('mmsi, lat, lon, sog, cog, vessel_type, name, flag, nav_status, updated_at')
             .order('incident_date', { ascending: false }),
           supabase
             .from('piracy_risk_zones')
-            .select('*')
+            .select('mmsi, lat, lon, sog, cog, vessel_type, name, flag, nav_status, updated_at')
             .eq('active', true)
         ])
 
@@ -76,8 +76,8 @@ export default function usePiracyData(): PiracyData {
         if (riskZonesResponse.error) throw riskZonesResponse.error
 
         if (mounted) {
-          setIncidents(incidentsResponse.data as PiracyIncident[])
-          setRiskZones(riskZonesResponse.data as PiracyRiskZone[])
+          setIncidents(incidentsResponse.data as unknown as PiracyIncident[])
+          setRiskZones(riskZonesResponse.data as unknown as PiracyRiskZone[])
         }
       } catch (err: any) {
         if (mounted) {
