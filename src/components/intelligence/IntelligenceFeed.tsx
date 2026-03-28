@@ -100,16 +100,6 @@ function getRelativeTime(isoRaw: string): string {
   return `${d} day${d !== 1 ? 's' : ''} ago`;
 }
 
-function deriveRegion(lat?: number, lon?: number): string {
-  if (lat === undefined || lon === undefined) return 'GLOBAL';
-  if (lat > 30 && lat < 47 && lon > -6 && lon < 36) return 'MEDITERRANEAN';
-  if (lat > 12 && lat < 30 && lon > 32 && lon < 44) return 'RED SEA';
-  if (lat > 23 && lat < 30 && lon > 48 && lon < 57) return 'PERSIAN GULF';
-  if (lat > -40 && lat < 30 && lon > 40 && lon < 100) return 'INDIAN OCEAN';
-  if (lon > -80 && lon < 20 && lat > -60 && lat < 70) return 'ATLANTIC';
-  if (lon < -80 || lon > 100) return 'PACIFIC';
-  return 'GLOBAL';
-}
 
 function getSeverityPill(severity: RiskEvent['severity'] | Brief['severity']): string {
   switch (severity) {
@@ -134,28 +124,7 @@ function getCategoryClasses(category: string): string {
   }
 }
 
-function getAnomalySeverity(type?: string): RiskEvent['severity'] {
-  if (!type) return 'MEDIUM';
-  const t = type.toUpperCase();
-  if (t.includes('CRITICAL')) return 'CRITICAL';
-  if (t.includes('HIGH')) return 'HIGH';
-  if (t.includes('LOW')) return 'LOW';
-  return 'MEDIUM';
-}
 
-// Ensure proper internal types matching API expected
-interface RawApiRecord {
-  id?: string;
-  title?: string;
-  detail?: string;
-  description?: string;
-  type?: string;
-  timestamp?: string;
-  createdAt?: string;
-  lat?: number;
-  lon?: number;
-  mmsi?: string;
-}
 
 export default function IntelligenceFeed() {
   const [activeRegion, setActiveRegion] = useState<Region>('GLOBAL');
@@ -170,80 +139,33 @@ export default function IntelligenceFeed() {
   }, []);
 
   const fetchFeeds = useCallback(async () => {
-    let threwError = false;
-    let hasData = false;
-    let newEvents: RiskEvent[] = [];
-
     try {
-      const [anomaliesRes, darkFleetRes] = await Promise.all([
-        fetch('/api/anomalies').catch(() => null),
-        fetch('/api/darkfleet').catch(() => null)
-      ]);
+      const [anomaliesRes, darkfleetRes] = await Promise.allSettled([
+        fetch('/api/anomalies', { cache: 'no-store' }),
+        fetch('/api/darkfleet', { cache: 'no-store' }),
+      ])
 
-      if (!anomaliesRes || !anomaliesRes.ok || !darkFleetRes || !darkFleetRes.ok) {
-        threwError = true;
-      }
+      const anomalyEvents: RiskEvent[] = 
+        anomaliesRes.status === 'fulfilled' && anomaliesRes.value.ok
+          ? await anomaliesRes.value.json()
+          : []
 
-      const parseResponse = async (res: Response | null) => {
-        if (!res || !res.ok) return [];
-        try {
-          const text = await res.text();
-          if (!text) return [];
-          const parsed = JSON.parse(text);
-          if (Array.isArray(parsed)) return parsed;
-          if (parsed && Array.isArray(parsed.data)) return parsed.data;
-          if (parsed && Array.isArray(parsed.events)) return parsed.events;
-          return [];
-        } catch {
-          return [];
-        }
-      };
+      const darkfleetEvents: RiskEvent[] =
+        darkfleetRes.status === 'fulfilled' && darkfleetRes.value.ok
+          ? await darkfleetRes.value.json()
+          : []
 
-      const anomaliesData = await parseResponse(anomaliesRes);
-      if (anomaliesData.length > 0) {
-        hasData = true;
-        const mapped = anomaliesData.map((item: RawApiRecord) => ({
-          id: item.id || `anon-${Math.random().toString(36).substring(2, 9)}`,
-          severity: getAnomalySeverity(item.type),
-          category: 'ANOMALY' as const,
-          title: item.title || item.type || 'UNKNOWN ANOMALY',
-          region: deriveRegion(item.lat, item.lon),
-          detail: item.detail || item.description || 'Anomaly detected',
-          timestamp: item.timestamp || item.createdAt || new Date().toISOString(),
-          mmsi: item.mmsi,
-          lat: item.lat,
-          lon: item.lon
-        }));
-        newEvents = [...newEvents, ...mapped];
-      }
+      const merged: RiskEvent[] = [...anomalyEvents, ...darkfleetEvents]
+        .sort((a, b) => {
+          const order = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 }
+          return order[a.severity] - order[b.severity]
+        })
 
-      const darkFleetData = await parseResponse(darkFleetRes);
-      if (darkFleetData.length > 0) {
-        hasData = true;
-        const mapped = darkFleetData.map((item: RawApiRecord) => ({
-          id: item.id || `df-${Math.random().toString(36).substring(2, 9)}`,
-          severity: 'HIGH' as const,
-          category: 'DARK FLEET' as const,
-          title: item.title || 'DARK FLEET ACTIVITY',
-          region: deriveRegion(item.lat, item.lon),
-          detail: item.detail || item.description || 'Dark fleet vessel detected',
-          timestamp: item.timestamp || item.createdAt || new Date().toISOString(),
-          mmsi: item.mmsi,
-          lat: item.lat,
-          lon: item.lon
-        }));
-        newEvents = [...newEvents, ...mapped];
-      }
-
-      if (hasData) {
-        newEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        setEvents(newEvents);
-      }
+      setEvents(merged)
+      setIsError(false)
     } catch {
-      threwError = true;
+      setIsError(true)
     }
-    
-    setIsError(threwError);
   }, []);
 
   useEffect(() => {
