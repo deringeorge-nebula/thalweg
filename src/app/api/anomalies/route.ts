@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url)
-  
+
   // Extract parameters
   const severity = searchParams.get('severity')
   const typeParam = searchParams.get('type')
@@ -63,14 +63,14 @@ export async function GET(request: Request) {
 
   // 1. Total Count Query (with filters)
   let countQuery = supabase
-    .from('anomalies')
+    .from('vessels')
     .select('*', { count: 'exact', head: true })
     .eq('resolved', false)
     .eq('false_positive', false)
 
   // 2. Data Query (with filters, sort, limit, offset)
   let dataQuery = supabase
-    .from('anomalies')
+    .from('vessels')
     .select('mmsi, lat, lon, sog, cog, vessel_type, name, flag, nav_status, updated_at')
     .eq('resolved', false)
     .eq('false_positive', false)
@@ -80,7 +80,7 @@ export async function GET(request: Request) {
     countQuery = countQuery.eq('severity', severity)
     dataQuery = dataQuery.eq('severity', severity)
   }
-  
+
   if (typeParam) {
     countQuery = countQuery.eq('anomaly_type', typeParam)
     dataQuery = dataQuery.eq('anomaly_type', typeParam)
@@ -88,20 +88,20 @@ export async function GET(request: Request) {
 
   dataQuery = dataQuery
     // Assuming Postgres ENUM is used for severity to match the DB order natively
-    .order('severity', { ascending: false }) 
+    .order('severity', { ascending: false })
     .order('detected_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
   // 3. Meta Counts — explicit queries for CRITICAL and HIGH to bypass PostgREST GROUP BY limitation
   const criticalCountQuery = supabase
-    .from('anomalies')
+    .from('vessels')
     .select('*', { count: 'exact', head: true })
     .eq('resolved', false)
     .eq('false_positive', false)
     .eq('severity', 'CRITICAL')
 
   const highCountQuery = supabase
-    .from('anomalies')
+    .from('vessels')
     .select('*', { count: 'exact', head: true })
     .eq('resolved', false)
     .eq('false_positive', false)
