@@ -27,65 +27,15 @@ interface RiskEvent {
   lon?: number;
 }
 
-interface Brief {
-  id: string;
-  region: string;
-  category: 'DARK FLEET' | 'PORT CONGESTION' | 'SANCTIONS' | 'PIRACY' | 'ENVIRONMENTAL';
-  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
-  headline: string;
-  summary: string;
-  vessels?: string[];
-  ports?: string[];
-  publishedAt: string;
-  classification: 'UNCLASSIFIED // OPEN SOURCE';
+interface IntelBrief {
+  id: string
+  title: string
+  summary: string
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
+  region: string
+  category: string
+  published_at: string
 }
-
-const STATIC_BRIEFS: Brief[] = [
-  {
-    id: 'ib-001',
-    region: 'RED SEA',
-    category: 'PIRACY',
-    severity: 'HIGH',
-    headline: 'Houthi Interdiction Activity — Bab-el-Mandeb Strait',
-    summary: 'Vessel traffic through the Bab-el-Mandeb Strait remains elevated risk. AIS analysis indicates continued rerouting via Cape of Good Hope for VLCC and container traffic exceeding 300m LOA. Transit delays of 12–18 days above baseline observed across affected routes. Vessels with Israeli beneficial ownership or port calls continue to represent primary targeting criteria.',
-    ports: ['Aden', 'Djibouti', 'Jeddah'],
-    publishedAt: '2026-03-28T06:00:00Z',
-    classification: 'UNCLASSIFIED // OPEN SOURCE'
-  },
-  {
-    id: 'ib-002',
-    region: 'PERSIAN GULF',
-    category: 'DARK FLEET',
-    severity: 'CRITICAL',
-    headline: 'Shadow Fleet STS Activity — Gulf of Oman Anchorage Zone',
-    summary: 'Sustained ship-to-ship transfer activity observed at established anchorage coordinates in the Gulf of Oman. Vessel behavioral analysis indicates AIS manipulation consistent with Iranian crude oil export evasion. Four vessels with expired or suspended class certificates identified operating within the transfer zone over the past 72 hours. Cross-reference against OFAC SDN and EU sanctions lists ongoing.',
-    vessels: ['UNKNOWN-01', 'UNKNOWN-02'],
-    ports: ['Khor Fakkan', 'Fujairah'],
-    publishedAt: '2026-03-27T18:00:00Z',
-    classification: 'UNCLASSIFIED // OPEN SOURCE'
-  },
-  {
-    id: 'ib-003',
-    region: 'INDIAN OCEAN',
-    category: 'PORT CONGESTION',
-    severity: 'MEDIUM',
-    headline: 'Colombo Terminal Congestion — Inbound Vessel Pipeline Elevated',
-    summary: 'Inbound vessel density within 50nm of Colombo Port has increased 18% above the 30-day baseline. Container feeder vessels represent the primary congestion driver. Current anchorage wait times estimated at 28–36 hours for non-priority berths. Colombo serves as the primary transshipment hub for South Asian container traffic — downstream schedule impacts expected across Visakhapatnam, Chennai, and Kochi feeders.',
-    ports: ['Colombo', 'Visakhapatnam', 'Chennai', 'Kochi'],
-    publishedAt: '2026-03-28T09:00:00Z',
-    classification: 'UNCLASSIFIED // OPEN SOURCE'
-  },
-  {
-    id: 'ib-004',
-    region: 'PACIFIC',
-    category: 'ENVIRONMENTAL',
-    severity: 'MEDIUM',
-    headline: 'IUU Fishing Activity — Western Pacific MPA Boundary Violations',
-    summary: 'AIS gap analysis across Western Pacific Marine Protected Areas indicates 6 fishing vessels with unexplained dark periods coinciding with MPA boundary crossings over the past 7 days. Vessel flag states: 3 China, 2 unregistered, 1 flag-of-convenience (Panama). Behavioral fingerprinting suggests repeat offenders — prior AIS dark events recorded at the same MPA coordinates in January 2026.',
-    publishedAt: '2026-03-27T12:00:00Z',
-    classification: 'UNCLASSIFIED // OPEN SOURCE'
-  }
-];
 
 function getRelativeTime(isoRaw: string): string {
   const ts = new Date(isoRaw).getTime();
@@ -101,7 +51,7 @@ function getRelativeTime(isoRaw: string): string {
 }
 
 
-function getSeverityPill(severity: RiskEvent['severity'] | Brief['severity']): string {
+function getSeverityPill(severity: RiskEvent['severity'] | IntelBrief['severity']): string {
   switch (severity) {
     case 'CRITICAL': return 'bg-[#ef4444] text-white';
     case 'HIGH': return 'bg-[#f97316] text-white';
@@ -129,6 +79,7 @@ function getCategoryClasses(category: string): string {
 export default function IntelligenceFeed() {
   const [activeRegion, setActiveRegion] = useState<Region>('GLOBAL');
   const [events, setEvents] = useState<RiskEvent[]>([]);
+  const [briefs, setBriefs] = useState<IntelBrief[]>([]);
   const [loading, setLoading] = useState(true);
   const [isError, setIsError] = useState(false);
   const [countdown, setCountdown] = useState(60);
@@ -140,9 +91,11 @@ export default function IntelligenceFeed() {
 
   const fetchFeeds = useCallback(async () => {
     try {
-      const [anomaliesRes, darkfleetRes] = await Promise.allSettled([
+      const [anomaliesRes, darkfleetRes, piracyRes, stsRes] = await Promise.allSettled([
         fetch('/api/anomalies', { cache: 'no-store' }),
         fetch('/api/darkfleet', { cache: 'no-store' }),
+        fetch('/api/piracy', { cache: 'no-store' }),
+        fetch('/api/sts', { cache: 'no-store' }),
       ])
 
       const anomalyEvents: RiskEvent[] = 
@@ -155,13 +108,32 @@ export default function IntelligenceFeed() {
           ? await darkfleetRes.value.json()
           : []
 
-      const merged: RiskEvent[] = [...anomalyEvents, ...darkfleetEvents]
-        .sort((a, b) => {
-          const order = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 }
-          return order[a.severity] - order[b.severity]
-        })
+      const piracyEvents: RiskEvent[] =
+        piracyRes.status === 'fulfilled' && piracyRes.value.ok
+          ? await piracyRes.value.json() : []
+
+      const stsEvents: RiskEvent[] =
+        stsRes.status === 'fulfilled' && stsRes.value.ok
+          ? await stsRes.value.json() : []
+
+      const merged: RiskEvent[] = [
+        ...darkfleetEvents,
+        ...stsEvents,
+        ...piracyEvents,
+        ...anomalyEvents,
+      ].sort((a, b) => {
+        const order = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 }
+        return order[a.severity] - order[b.severity]
+      })
 
       setEvents(merged)
+
+      const briefsRes = await fetch('/api/risk-zones', { cache: 'no-store' })
+      const briefsData: IntelBrief[] = briefsRes.ok 
+        ? await briefsRes.json() 
+        : []
+      setBriefs(briefsData)
+
       setIsError(false)
     } catch {
       setIsError(true)
@@ -195,8 +167,8 @@ export default function IntelligenceFeed() {
     : events.filter((e) => e.region.includes(activeRegion));
 
   const filteredBriefs = activeRegion === 'GLOBAL'
-    ? STATIC_BRIEFS
-    : STATIC_BRIEFS.filter((b) => b.region === activeRegion);
+    ? briefs
+    : briefs.filter((b) => b.region === activeRegion);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 w-full flex flex-col min-h-screen">
@@ -292,7 +264,7 @@ export default function IntelligenceFeed() {
                        </span>
                      </div>
                      <div className="text-white font-mono text-sm leading-snug mt-2">
-                       {brief.headline}
+                       {brief.title}
                      </div>
                      <div className="text-slate-300 text-xs leading-relaxed mt-2">
                        {brief.summary}
@@ -300,36 +272,11 @@ export default function IntelligenceFeed() {
                      
                      <div className="border-t border-[#1a2744] mt-3 pt-2">
                        <div className="text-slate-500 text-[10px] font-mono tracking-widest uppercase">
-                         CLASSIFICATION: {brief.classification}
+                         CLASSIFICATION: UNCLASSIFIED // OPEN SOURCE
                        </div>
                        <div className="text-slate-500 text-[10px] font-mono mt-1 uppercase">
-                         Published: {mounted ? getRelativeTime(brief.publishedAt) : '...'} · {brief.region}
+                         Published: {mounted ? getRelativeTime(brief.published_at) : '...'} · {brief.region}
                        </div>
-                       
-                       {(brief.ports?.length || brief.vessels?.length) ? (
-                         <div className="mt-2 space-y-1 block">
-                           {brief.ports && brief.ports.length > 0 && (
-                             <div className="block">
-                               <span className="text-slate-500 text-[10px] font-mono mr-1">PORTS:</span>
-                               {brief.ports.map(port => (
-                                 <span key={port} className="border border-[#1a2744] text-[10px] text-slate-400 font-mono px-1.5 py-0.5 inline-block mr-1">
-                                   {port.toUpperCase()}
-                                 </span>
-                               ))}
-                             </div>
-                           )}
-                           {brief.vessels && brief.vessels.length > 0 && (
-                             <div className="block mt-1">
-                               <span className="text-slate-500 text-[10px] font-mono mr-1">VESSELS:</span>
-                               {brief.vessels.map(v => (
-                                 <span key={v} className="border border-[#1a2744] text-[10px] text-slate-400 font-mono px-1.5 py-0.5 inline-block mr-1">
-                                   {v.toUpperCase()}
-                                 </span>
-                               ))}
-                             </div>
-                           )}
-                         </div>
-                       ) : null}
                      </div>
                   </div>
                 ))
