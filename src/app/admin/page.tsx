@@ -53,29 +53,56 @@ export default async function AdminPage() {
 
   const [
     { count: vesselCount },
+    { count: activeVesselCount },
     { count: anomalyCount },
     { count: darkFleetCount },
-    { count: watchCount },
     { count: sanctionsCount },
-    { data: positionsData },
+    { count: stsCount },
+    { count: piracyCount },
+    { count: activeZoneCount },
   ] = await Promise.all([
-    supabase.from('vessels').select('*', { count: 'exact', head: true }),
-    supabase.from('anomalies').select('*', { count: 'exact', head: true }).eq('is_resolved', false),
-    supabase.from('dark_fleet_vessels').select('*', { count: 'exact', head: true }),
-    supabase.from('watched_vessels').select('*', { count: 'exact', head: true }).eq('is_active', true),
-    supabase.from('sanctions_list').select('*', { count: 'exact', head: true }).eq('is_active', true),
-    supabase.rpc('get_positions_stats'),
+    supabase
+      .from('vessels')
+      .select('*', { count: 'exact', head: true }),
+    supabase
+      .from('vessels')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true)
+      .not('lat', 'is', null),
+    supabase
+      .from('vessels')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_anomaly', true),
+    supabase
+      .from('vessels')
+      .select('*', { count: 'exact', head: true })
+      .gte('dark_fleet_score', 60),
+    supabase
+      .from('vessels')
+      .select('*', { count: 'exact', head: true })
+      .eq('sanctions_match', true),
+    supabase
+      .from('sts_events')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true),
+    supabase
+      .from('piracy_incidents')
+      .select('*', { count: 'exact', head: true }),
+    supabase
+      .from('piracy_risk_zones')
+      .select('*', { count: 'exact', head: true })
+      .eq('active', true),
   ])
 
-  const positionsSize = positionsData != null ? String(positionsData) : '74 MB'
-
   const stats: { label: string; value: string | number; accent: string }[] = [
-    { label: 'TRACKED VESSELS',  value: vesselCount    ?? 0, accent: '#00d4ff' },
-    { label: 'ACTIVE ANOMALIES', value: anomalyCount   ?? 0, accent: '#f97316' },
-    { label: 'DARK FLEET',       value: darkFleetCount ?? 0, accent: '#eab308' },
-    { label: 'WATCHED VESSELS',  value: watchCount     ?? 0, accent: '#00d4ff' },
-    { label: 'SANCTIONS ACTIVE', value: sanctionsCount ?? 0, accent: '#ef4444' },
-    { label: 'POSITIONS (6H)',   value: positionsSize,        accent: '#00d4ff' },
+    { label: 'TOTAL VESSELS',     value: vesselCount        ?? 0, accent: '#00d4ff' },
+    { label: 'ACTIVE W/ POSITION',value: activeVesselCount  ?? 0, accent: '#10b981' },
+    { label: 'ANOMALIES',         value: anomalyCount        ?? 0, accent: '#f97316' },
+    { label: 'DARK FLEET ≥60',    value: darkFleetCount      ?? 0, accent: '#eab308' },
+    { label: 'SANCTIONS MATCH',   value: sanctionsCount      ?? 0, accent: '#ef4444' },
+    { label: 'ACTIVE STS',        value: stsCount            ?? 0, accent: '#8b5cf6' },
+    { label: 'PIRACY INCIDENTS',  value: piracyCount         ?? 0, accent: '#f97316' },
+    { label: 'RISK ZONES ACTIVE', value: activeZoneCount     ?? 0, accent: '#ef4444' },
   ]
 
   const statusRows: { label: string; status: string }[] = [
@@ -108,7 +135,7 @@ export default async function AdminPage() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {stats.map(({ label, value, accent }) => (
           <div
             key={label}
@@ -161,6 +188,46 @@ export default async function AdminPage() {
             >
               <span className="text-slate-400 font-data text-xs">{label}</span>
               <span className="flex items-center gap-2 font-data text-xs text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                {status}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* API Routes */}
+      <div className="mt-8">
+        <div className="text-slate-400 text-xs font-data tracking-widest mb-3">
+          API ROUTES
+        </div>
+        <div className="bg-[#0d1424] border border-[#1a2744] rounded-lg divide-y divide-[#1a2744]">
+          {[
+            { path: '/api/darkfleet',             method: 'GET', status: 'LIVE' },
+            { path: '/api/anomalies',             method: 'GET', status: 'LIVE' },
+            { path: '/api/piracy',                method: 'GET', status: 'LIVE' },
+            { path: '/api/sts',                   method: 'GET', status: 'LIVE' },
+            { path: '/api/risk-zones',            method: 'GET', status: 'LIVE' },
+            { path: '/api/route-risks',           method: 'GET', status: 'LIVE' },
+            { path: '/api/vessel/[mmsi]',         method: 'GET', status: 'LIVE' },
+            { path: '/api/vessel/[mmsi]/track',   method: 'GET', status: 'LIVE' },
+            { path: '/api/port/[locode]',         method: 'GET', status: 'LIVE' },
+            { path: '/api/port/[locode]/forecast',method: 'GET', status: 'LIVE' },
+            { path: '/api/spill',                 method: 'GET', status: 'LIVE' },
+            { path: '/api/watch',                 method: 'GET', status: 'LIVE' },
+          ].map(({ path, method, status }) => (
+            <div
+              key={path}
+              className="flex items-center justify-between px-4 py-2.5"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-data bg-[#00d4ff]/10 text-[#00d4ff] 
+                                 border border-[#00d4ff]/30 px-1.5 py-0.5 rounded">
+                  {method}
+                </span>
+                <span className="text-slate-300 font-data text-xs">{path}</span>
+              </div>
+              <span className="flex items-center gap-1.5 font-data text-xs text-emerald-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
                 {status}
               </span>
