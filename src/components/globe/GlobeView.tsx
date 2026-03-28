@@ -29,6 +29,8 @@ import type { PortWithCongestion } from '@/hooks/usePortCongestion';
 import PortPanel from './PortPanel';
 import { trackVesselClick } from '@/lib/analytics';
 import { ComparePanel } from './ComparePanel';
+import { useWatchList } from '@/hooks/useWatchList';
+import WatchListPanel from '@/components/globe/WatchListPanel';
 
 // Natural Earth 110m land polygons — public domain, no API key required
 const LAND_DATA_URL =
@@ -95,6 +97,8 @@ export default function GlobeViewComponent({
     const [selectedVessel, setSelectedVessel] = useState<VesselRow | null>(null);
     const [comparedVessel, setComparedVessel] = useState<any>(null);
     const [showCompare, setShowCompare] = useState(false);
+    const [showWatchList, setShowWatchList] = useState(false);
+    const { watchList, isWatched } = useWatchList();
     const { track } = useVesselTrack(
         selectedVessel?.mmsi ? Number(selectedVessel.mmsi) : null
     );
@@ -359,6 +363,21 @@ export default function GlobeViewComponent({
         })
       : null
 
+    const watchedMmsiSet = new Set(watchList.map(v => v.mmsi));
+    const watchedVesselLayer = new ScatterplotLayer({
+        id: 'watched-vessels',
+        data: globeData.vessels.filter((v: any) => watchedMmsiSet.has(v.mmsi)),
+        getPosition: (d: any) => [d.lon, d.lat],
+        getRadius: 900,
+        getFillColor: [0, 212, 255, 180],
+        getLineColor: [0, 212, 255, 255],
+        stroked: true,
+        lineWidthMinPixels: 2,
+        pickable: false,
+        radiusMinPixels: 6,
+        radiusMaxPixels: 20,
+    });
+
     // ── deck.gl layers ─────────────────────────────────────────────────────────
     const layers = showHeatmap
         ? [heatmapLayer, ...(trackLayer ? [trackLayer] : []), routeLineLayer, waypointLayer].filter(Boolean)
@@ -396,6 +415,7 @@ export default function GlobeViewComponent({
                 pickable: true,
                 onClick: ({ object }: { object: any }) => {
                     if (object) {
+                        setShowWatchList(false)
                         setSelectedPort(null)
                         setSelectedPiracy(null)
                         setSpillResult(null)
@@ -428,6 +448,7 @@ export default function GlobeViewComponent({
                 pickable: true,
                 onClick: ({ object }: { object: PortWithCongestion }) => {
                     if (object) {
+                        setShowWatchList(false)
                         setSelectedVessel(null)
                         setSelectedPiracy(null)
                         setSpillResult(null)
@@ -481,6 +502,7 @@ export default function GlobeViewComponent({
                 pickable: true,
                 onClick: ({ object }: { object: any }) => {
                     if (object) {
+                        setShowWatchList(false)
                         setSelectedVessel(null)
                         setSelectedPort(null)
                         setSpillResult(null)
@@ -552,6 +574,7 @@ export default function GlobeViewComponent({
                 onClick: ({ index }: any) => {
                     if (index >= 0 && index < globeData.vessels.length) {
                         const v = globeData.vessels[index];
+                        setShowWatchList(false)
                         setSelectedPort(null)
                         setSelectedPiracy(null)
                         setSpillResult(null)
@@ -577,6 +600,7 @@ export default function GlobeViewComponent({
                     }
                 },
             }),
+            ...(watchList.length > 0 ? [watchedVesselLayer] : []),
             ...(trackLayer ? [trackLayer] : []),
             ...(routeLineLayer ? [routeLineLayer] : []),
             ...(waypointLayer ? [waypointLayer] : []),
@@ -617,6 +641,7 @@ export default function GlobeViewComponent({
                     <VesselSearchBar
                         vessels={globeData.vessels}
                         onVesselSelect={(vessel) => {
+                            setShowWatchList(false)
                             setSelectedPort(null)
                             setSelectedPiracy(null)
                             setSpillResult(null)
@@ -729,6 +754,21 @@ export default function GlobeViewComponent({
                             }`}
                     >
                         DENSITY
+                    </button>
+                    <button
+                        onClick={() => setShowWatchList(prev => {
+                            if (!prev) {
+                                // closing selected vessel if watchlist opens
+                                setSelectedVessel(null)
+                            }
+                            return !prev
+                        })}
+                        className={`font-mono tracking-widest text-[10px] px-3 py-1.5 transition-colors touch-manipulation border flex-shrink-0 ${showWatchList
+                            ? 'bg-[#00d4ff] text-[#0a0f1e] border-[#00d4ff]/30 hover:border-[#00d4ff]'
+                            : 'bg-transparent text-slate-400 hover:text-[#00d4ff] border-[#00d4ff]/30 hover:border-[#00d4ff]'
+                            }`}
+                    >
+                        {watchList.length === 0 ? 'WATCHLIST' : `WATCHLIST [${watchList.length}]`}
                     </button>
                 </div>
 
@@ -858,6 +898,25 @@ export default function GlobeViewComponent({
                       </span>
                     </button>
 
+                    {/* WATCH LIST */}
+                    <button
+                      onClick={() => {
+                        setShowWatchList(true)
+                        setLayersOpen(false)
+                        setSelectedVessel(null)
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-3 border border-[#1a2744] bg-[#0d1424] transition-colors touch-manipulation"
+                    >
+                      <span className="font-mono tracking-widest text-xs text-slate-400">WATCH LIST</span>
+                      {watchList.length > 0 ? (
+                        <span className="text-[#00d4ff] font-mono tracking-widest text-xs">
+                           {watchList.length} VESSEL{watchList.length !== 1 ? 'S' : ''}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 font-mono tracking-widest text-xs">EMPTY</span>
+                      )}
+                    </button>
+
                   </div>
 
                   {/* Active count footer */}
@@ -945,6 +1004,23 @@ export default function GlobeViewComponent({
                 <VesselPanel
                     vessel={selectedVessel}
                     onClose={() => { setSelectedVessel(null); setSpillResult(null) }}
+                />
+            )}
+
+            {/* Watch List panel */}
+            {showWatchList && (
+                <WatchListPanel
+                    onClose={() => setShowWatchList(false)}
+                    onSelectVessel={(mmsi: string) => {
+                        const vessel = globeData.vessels.find((v: any) => v.mmsi === mmsi)
+                        if (vessel) {
+                            setSelectedPort(null)
+                            setSelectedPiracy(null)
+                            setSpillResult(null)
+                            setSelectedVessel(vessel)
+                            setShowWatchList(false)
+                        }
+                    }}
                 />
             )}
 

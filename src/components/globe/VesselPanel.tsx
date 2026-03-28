@@ -9,6 +9,8 @@ import { NAV_STATUS_LABELS } from '@/types/vessel';
 import WatchPanel from '@/components/panels/WatchPanel';
 import { trackIntelBrief } from '@/lib/analytics';
 import { useVesselTrack } from '@/hooks/useVesselTrack';
+import { useWatchList } from '@/hooks/useWatchList';
+import type { WatchedVessel } from '@/hooks/useWatchList';
 
 interface Props {
     vessel: VesselRow;
@@ -23,6 +25,9 @@ export default function VesselPanel({ vessel, onClose }: Props) {
     const { track, isLoading: trackLoading, hasTrack } = useVesselTrack(
         vessel?.mmsi ? Number(vessel.mmsi) : null
     );
+
+    const { addVessel, removeVessel, isWatched } = useWatchList();
+    const watched = isWatched(vessel.mmsi);
 
     useEffect(() => {
         setBrief(null);
@@ -99,6 +104,35 @@ export default function VesselPanel({ vessel, onClose }: Props) {
 
             {/* Data rows */}
             <div className="p-4 space-y-2.5">
+                <div className="flex mb-3">
+                    {!watched ? (
+                        <button
+                            onClick={() => {
+                                const watchedVessel: WatchedVessel = {
+                                    mmsi: vessel.mmsi,
+                                    // @ts-expect-error vessel prop type mismatch
+                                    name: vessel.name ?? vessel.vessel_name ?? 'UNKNOWN',
+                                    // @ts-expect-error vessel prop type mismatch
+                                    vessel_type: vessel.vessel_type ?? 0,
+                                    // @ts-expect-error vessel prop type mismatch
+                                    flag: vessel.flag ?? vessel.flag_state ?? '',
+                                    addedAt: new Date().toISOString()
+                                }
+                                addVessel(watchedVessel)
+                            }}
+                            className="font-mono tracking-widest text-[10px] border border-[#00d4ff] text-[#00d4ff] px-3 py-1.5 hover:bg-[#00d4ff] hover:text-[#0a0f1e] transition-colors touch-manipulation w-full sm:w-auto"
+                        >
+                            ☆ WATCH
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => removeVessel(vessel.mmsi)}
+                            className="font-mono tracking-widest text-[10px] bg-[#00d4ff] text-[#0a0f1e] px-3 py-1.5 hover:bg-transparent hover:text-[#00d4ff] hover:border-[#00d4ff] border border-[#00d4ff] transition-colors touch-manipulation w-full sm:w-auto"
+                        >
+                            ★ WATCHING
+                        </button>
+                    )}
+                </div>
                 <DataRow label="MMSI" value={vessel.mmsi} />
                 {vessel.imo_number && <DataRow label="IMO" value={vessel.imo_number} />}
                 {vessel.call_sign && <DataRow label="CALLSIGN" value={vessel.call_sign} />}
@@ -167,7 +201,7 @@ export default function VesselPanel({ vessel, onClose }: Props) {
                     </div>
                     {hasTrack && (
                         <div className="text-[9px] font-data text-slate-500 mt-1">
-                            From {new Date(track[0].recorded_at).toUTCString().slice(0,22)} UTC
+                            From {new Date(track[0].recorded_at).toUTCString().slice(0, 22)} UTC
                         </div>
                     )}
                 </div>
