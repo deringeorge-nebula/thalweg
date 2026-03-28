@@ -8,9 +8,9 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { VesselRow } from '@/types/vessel';
 
-const REALTIME_CONNECTION_LIMIT = 180; // Supabase free tier is 200; use 180 as ceiling
+const REALTIME_CONNECTION_LIMIT = 180;
 const POLLING_INTERVAL_MS = 30_000;
-const INITIAL_FETCH_LIMIT = 50_000;
+const INITIAL_FETCH_LIMIT = 10_000;
 
 export function useVesselStream() {
     const supabase = useMemo(() => createClient(), []);
@@ -23,27 +23,58 @@ export function useVesselStream() {
     // ── Initial bulk fetch ─────────────────────────────────────────────────────
     useEffect(() => {
         async function initialLoad() {
-            const { data, error } = await supabase
+            // PHASE 1 — Priority vessels (dark fleet + anomalies + sanctions)
+            const { data: priority } = await supabase
                 .from('vessels')
-                .select('mmsi, lat, lon, sog, cog, vessel_type, name, flag')
+                .select('mmsi, vessel_name, type_category, type_color, lat, lon, sog, cog, nav_status, is_active, is_anomaly, sanctions_match, dark_fleet_score, last_update')
                 .eq('is_active', true)
                 .not('lat', 'is', null)
-                .limit(500)
-                .order('updated_at', { ascending: false });
+                .or('is_anomaly.eq.true,sanctions_match.eq.true,dark_fleet_score.gte.40')
+                .order('dark_fleet_score', { ascending: false, nullsFirst: false })
+                .limit(500);
 
-            if (!error && data) {
-                // Merge into vesselMapRef
-                for (const vessel of data as any[]) {
-                    vesselMapRef.current.set(vessel.mmsi, vessel as any)
+            if (priority) {
+                for (const vessel of priority as VesselRow[]) {
+                    vesselMapRef.current.set(vessel.mmsi, vessel);
                 }
             }
 
             setTotalCount(vesselMapRef.current.size);
             setDataFreshness(new Date());
             setIsLoading(false);
+
+            // PHASE 2 — Bulk load remaining vessels
+            let offset = 0;
+            const PAGE_SIZE = 5000;
+
+            while (offset < INITIAL_FETCH_LIMIT) {
+                if (offset >= INITIAL_FETCH_LIMIT) break;
+
+                const { data: page, error: pageError } = await supabase
+                    .from('vessels')
+                    .select('mmsi, vessel_name, type_category, type_color, lat, lon, sog, cog, nav_status, is_active, is_anomaly, sanctions_match, dark_fleet_score, last_update')
+                    .eq('is_active', true)
+                    .not('lat', 'is', null)
+                    .order('last_update', { ascending: false })
+                    .range(offset, offset + PAGE_SIZE - 1);
+
+                if (pageError || !page || page.length === 0) break;
+
+                for (const vessel of page as VesselRow[]) {
+                    if (!vesselMapRef.current.has(vessel.mmsi)) {
+                        vesselMapRef.current.set(vessel.mmsi, vessel);
+                    }
+                }
+
+                setTotalCount(vesselMapRef.current.size);
+                setDataFreshness(new Date());
+
+                if (page.length < PAGE_SIZE) break;
+                offset += PAGE_SIZE;
+            }
         }
 
-        initialLoad()
+        initialLoad();
     }, [supabase]);
 
     // ── Supabase Realtime subscription ───────────────────────────────────────
@@ -87,27 +118,22 @@ export function useVesselStream() {
     }, [supabase]);
 
     // ── 30-second REST polling fallback ────────────────────────────────────────
-    // Activates automatically when Realtime is not working.
-    // Also runs always to catch vessels that Realtime missed.
     useEffect(() => {
         const poll = async () => {
-            const since = new Date(Date.now() - POLLING_INTERVAL_MS * 2).toISOString();
-
             const { data, error } = await supabase
                 .from('vessels')
-                .select('mmsi,vessel_name,type_category,type_color,lat,lon,sog,cog,nav_status,is_active,is_anomaly,sanctions_match,dark_fleet_score,last_update')
+                .select('mmsi, vessel_name, type_category, type_color, lat, lon, sog, cog, nav_status, is_active, is_anomaly, sanctions_match, dark_fleet_score, last_update')
                 .eq('is_active', true)
-                .gte('last_update', since)
                 .not('lat', 'is', null)
-                .limit(5000);
+                .order('last_update', { ascending: false })
+                .limit(REALTIME_CONNECTION_LIMIT);
 
             if (error || !data) return;
 
-            data.forEach((v) => {
+            for (const v of data as VesselRow[]) {
                 const existing = vesselMapRef.current.get(v.mmsi);
-                // Merge — preserve existing fields not included in the polling select
                 vesselMapRef.current.set(v.mmsi, { ...existing, ...v } as VesselRow);
-            });
+            }
 
             setTotalCount(vesselMapRef.current.size);
             setDataFreshness(new Date());
