@@ -14,6 +14,7 @@ import { TripsLayer } from '@deck.gl/geo-layers';
 import { ScatterplotLayer, GeoJsonLayer, GridCellLayer, PolygonLayer, LineLayer } from '@deck.gl/layers';
 import { GridLayer } from '@deck.gl/aggregation-layers';
 import usePiracyData, { PiracyIncident } from '@/hooks/usePiracyData';
+import { useStsData, type StsEvent } from '@/hooks/useStsData';
 import { useRouteRisk } from '@/hooks/useRouteRisk';
 import { RouteRiskPanel } from '../panels/RouteRiskPanel';
 import { SpillResult } from '@/hooks/useSpillPredictor';
@@ -117,6 +118,8 @@ export default function GlobeViewComponent({
     const [showHeatmap, setShowHeatmap] = useState(false);
     const [layersOpen, setLayersOpen] = useState(false);
     const { incidents: piracyIncidents, riskZones } = usePiracyData();
+    const { stsEvents } = useStsData();
+    const [showSts, setShowSts] = useState(true);
 
     const darkFleetVessels = useMemo(
         () => globeData.vessels.filter((v: any) => (v.darkFleetScore ?? v.dark_fleet_score ?? 0) >= 60),
@@ -512,6 +515,48 @@ export default function GlobeViewComponent({
                 updateTriggers: { getFillColor: [], getRadius: [] }
             })] : []),
 
+            // STS Transfer layer
+            ...(showSts ? [new ScatterplotLayer({
+                id: 'sts-transfers',
+                data: stsEvents,
+                getPosition: (d: StsEvent) => [d.lon, d.lat],
+                getRadius: (d: StsEvent) => {
+                  const s = d.risk_score ?? 0
+                  if (s >= 80) return 55000
+                  if (s >= 60) return 40000
+                  return 28000
+                },
+                getFillColor: (d: StsEvent) => {
+                  const s = d.risk_score ?? 0
+                  if (s >= 80) return [139, 92, 246, 220]  // purple — critical
+                  if (s >= 60) return [167, 139, 250, 190]  // light purple — high
+                  return [196, 181, 253, 150]               // pale purple — medium
+                },
+                getLineColor: [139, 92, 246, 200],
+                lineWidthMinPixels: 1.5,
+                stroked: true,
+                radiusMinPixels: 5,
+                radiusMaxPixels: 22,
+                pickable: true,
+                onClick: ({ object }: { object: StsEvent }) => {
+                  if (object?.mmsi1) {
+                    setShowWatchList(false)
+                    setSelectedPort(null)
+                    setSelectedPiracy(null)
+                    setSpillResult(null)
+                    // Find vessel in globeData by mmsi1 and select it
+                    const vessel = globeData.vessels.find(
+                      (v: VesselRow) => v.mmsi === object.mmsi1
+                    )
+                    if (vessel) setSelectedVessel(vessel)
+                  }
+                },
+                updateTriggers: {
+                  getFillColor: stsEvents.length,
+                  getRadius: stsEvents.length,
+                },
+            })] : []),
+
             // Spill prediction polygon layers
             ...(spillResult ? [
                 new PolygonLayer({
@@ -745,6 +790,15 @@ export default function GlobeViewComponent({
                     >
                         PIRACY
                     </button>
+                    <button
+                        onClick={() => setShowSts(s => !s)}
+                        className={`font-data font-medium border transition-all touch-manipulation min-h-[36px] sm:min-h-0 rounded px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0 ${showSts
+                            ? 'bg-[#8b5cf6]/20 border-[#8b5cf6] text-[#8b5cf6]'
+                            : 'bg-navy-950/40 border-gray-600 text-gray-400 hover:border-gray-400'
+                            }`}
+                    >
+                        STS
+                    </button>
                     {/* DENSITY button */}
                     <button
                         onClick={() => setShowHeatmap(!showHeatmap)}
@@ -882,6 +936,21 @@ export default function GlobeViewComponent({
                       </span>
                     </button>
 
+                    <button
+                      onClick={() => setShowSts(!showSts)}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${showSts
+                          ? 'border-[#8b5cf6] bg-[#8b5cf6]/10 text-[#8b5cf6]'
+                          : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
+                        }`}
+                    >
+                      <span>STS TRANSFERS</span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${showSts 
+                          ? 'bg-[#8b5cf6]/20 text-[#8b5cf6]' 
+                          : 'bg-[#1a2744] text-slate-600'}`}>
+                        {showSts ? 'ON' : 'OFF'}
+                      </span>
+                    </button>
+
                     {/* DENSITY */}
                     <button
                       onClick={() => setShowHeatmap(!showHeatmap)}
@@ -922,7 +991,7 @@ export default function GlobeViewComponent({
                   {/* Active count footer */}
                   <div className="px-5 py-3 border-t border-[#1a2744]">
                     <span className="text-slate-600 text-[10px] font-data tracking-widest">
-                      {[isRouteMode, sstVisible, darkFleetVisible, showPiracy, showHeatmap].filter(Boolean).length} LAYER(S) ACTIVE
+                      {[isRouteMode, sstVisible, darkFleetVisible, showPiracy, showSts, showHeatmap].filter(Boolean).length} LAYER(S) ACTIVE
                     </span>
                   </div>
 
