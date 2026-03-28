@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { generateVesselBrief } from '@/lib/intelligenceBrief';
-import { X, Ship, AlertTriangle, AlertCircle, Navigation, Sparkles, Loader2 } from 'lucide-react';
+import { X, Ship, AlertTriangle, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
 import type { VesselRow } from '@/types/vessel';
 import { NAV_STATUS_LABELS } from '@/types/vessel';
 import WatchPanel from '@/components/panels/WatchPanel';
@@ -110,12 +110,9 @@ export default function VesselPanel({ vessel, onClose }: Props) {
                             onClick={() => {
                                 const watchedVessel: WatchedVessel = {
                                     mmsi: vessel.mmsi,
-                                    // @ts-expect-error vessel prop type mismatch
-                                    name: vessel.name ?? vessel.vessel_name ?? 'UNKNOWN',
-                                    // @ts-expect-error vessel prop type mismatch
-                                    vessel_type: vessel.vessel_type ?? 0,
-                                    // @ts-expect-error vessel prop type mismatch
-                                    flag: vessel.flag ?? vessel.flag_state ?? '',
+                                    name: vessel.vessel_name ?? 'UNKNOWN',
+                                    vessel_type: vessel.nav_status ?? 0,
+                                    flag: vessel.flag_state ?? '',
                                     addedAt: new Date().toISOString()
                                 }
                                 addVessel(watchedVessel)
@@ -177,6 +174,40 @@ export default function VesselPanel({ vessel, onClose }: Props) {
                             })}
                             muted
                         />
+                    </>
+                )}
+
+                {(vessel.dark_fleet_score ?? 0) > 0 && (
+                    <>
+                        <div className="border-t border-glow my-2" />
+                        <div className="flex justify-between items-baseline gap-2 mb-1">
+                            <span className="text-text-muted text-xs font-data flex-shrink-0">
+                                DARK FLEET SCORE
+                            </span>
+                            <span
+                                className={`text-xs font-data font-bold ${
+                                    (vessel.dark_fleet_score ?? 0) >= 80
+                                        ? 'text-alert-critical'
+                                        : (vessel.dark_fleet_score ?? 0) >= 60
+                                        ? 'text-alert-warning'
+                                        : 'text-yellow-400'
+                                }`}
+                            >
+                                {vessel.dark_fleet_score}/100
+                            </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-[#1a2744] rounded-full overflow-hidden">
+                            <div
+                                className={`h-full rounded-full transition-all ${
+                                    (vessel.dark_fleet_score ?? 0) >= 80
+                                        ? 'bg-alert-critical'
+                                        : (vessel.dark_fleet_score ?? 0) >= 60
+                                        ? 'bg-alert-warning'
+                                        : 'bg-yellow-400'
+                                }`}
+                                style={{ width: `${vessel.dark_fleet_score ?? 0}%` }}
+                            />
+                        </div>
                     </>
                 )}
 
