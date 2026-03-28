@@ -2,7 +2,6 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
-export const revalidate = 60
 export const dynamic = 'force-dynamic'
 
 interface RiskEvent {
@@ -18,18 +17,15 @@ interface RiskEvent {
   lon?: number
 }
 
-interface DarkFleetRow {
-  mmsi: string
-  vessel_name: string | null
-  dark_fleet_score: number | null
+interface AnomalyRow {
+  id: string
+  severity: string | null
+  title: string | null
+  description: string | null
+  mmsi: string | null
   lat: number | null
   lon: number | null
-  sog: number | null
-  flag_state: string | null
-  sanctions_match: boolean | null
-  is_anomaly: boolean | null
-  nav_status: number | null
-  last_update: string | null
+  detected_at: string | null
 }
 
 function deriveRegion(lat?: number | null, lon?: number | null): string {
@@ -43,12 +39,6 @@ function deriveRegion(lat?: number | null, lon?: number | null): string {
   return 'GLOBAL'
 }
 
-function vesselLabel(row: DarkFleetRow): string {
-  return row.vessel_name && row.vessel_name.trim() !== ''
-    ? row.vessel_name.trim()
-    : `MMSI ${row.mmsi}`
-}
-
 export async function GET() {
   try {
     const supabase = createClient(
@@ -57,11 +47,15 @@ export async function GET() {
     )
 
     const { data, error } = await supabase
-      .from('alerts')
-      .select('mmsi, vessel_name, dark_fleet_score, lat, lon, sog, flag_state, sanctions_match, is_anomaly, nav_status, last_update')
+      .from('anomalies')
+      .select('id, severity, title, description, mmsi, lat, lon, detected_at')
+      .eq('anomaly_type', 'DARK_VESSEL')
+      .eq('resolved', false)
+      .eq('false_positive', false)
+      .in('severity', ['CRITICAL', 'HIGH'])
       .not('lat', 'is', null)
       .not('lon', 'is', null)
-      .order('dark_fleet_score', { ascending: false })
+      .order('detected_at', { ascending: false })
       .limit(50)
 
     if (error) {
@@ -69,45 +63,21 @@ export async function GET() {
       return NextResponse.json([], { status: 200 })
     }
 
-    const events: RiskEvent[] = (data ?? []).map((v: DarkFleetRow): RiskEvent => {
-      const score = v.dark_fleet_score ?? 0
-      const sog = v.sog ?? 0
-      const isSanctioned = v.sanctions_match === true
-
-      let severity: RiskEvent['severity']
-      if (isSanctioned || score >= 79) severity = 'CRITICAL'
-      else if (score >= 73) severity = 'HIGH'
-      else if (score >= 63) severity = 'MEDIUM'
-      else severity = 'LOW'
-
-      const category: RiskEvent['category'] = isSanctioned ? 'SANCTIONS' : 'DARK FLEET'
-
-      const title = isSanctioned
-        ? `SANCTIONS MATCH — ${vesselLabel(v)}`
-        : `DARK FLEET DETECTED — ${vesselLabel(v)}`
-
-      const detail = isSanctioned
-        ? `Vessel flagged as sanctions match. Dark fleet score: ${score}/100. SOG: ${sog.toFixed(1)} kts. Flag: ${v.flag_state ?? 'UNKNOWN'}.`
-        : `Dark fleet score: ${score}/100. SOG: ${sog.toFixed(1)} kts. Flag: ${v.flag_state ?? 'UNKNOWN'}. AIS manipulation risk detected.`
-
-      return {
-        id: `darkfleet-${v.mmsi}`,
-        severity,
-        category,
-        title,
-        region: deriveRegion(v.lat, v.lon),
-        detail,
-        timestamp: v.last_update ?? new Date().toISOString(),
-        mmsi: v.mmsi,
-        lat: v.lat ?? undefined,
-        lon: v.lon ?? undefined,
-      }
-    })
+    const events: RiskEvent[] = (data ?? []).map((v: AnomalyRow): RiskEvent => ({
+      id: `darkfleet-${v.id}`,
+      severity: (v.severity as RiskEvent['severity']) ?? 'HIGH',
+      category: 'DARK FLEET',
+      title: v.title ?? `DARK VESSEL DETECTED — MMSI ${v.mmsi ?? 'UNKNOWN'}`,
+      region: deriveRegion(v.lat, v.lon),
+      detail: v.description ?? 'Dark vessel anomaly detected.',
+      timestamp: v.detected_at ?? new Date().toISOString(),
+      mmsi: v.mmsi ?? undefined,
+      lat: v.lat ?? undefined,
+      lon: v.lon ?? undefined,
+    }))
 
     return NextResponse.json(events, {
-      headers: {
-        'Cache-Control': 's-maxage=60, stale-while-revalidate=30',
-      },
+      headers: { 'Cache-Control': 's-maxage=60, stale-while-revalidate=30' },
     })
   } catch (err) {
     console.error('[darkfleet] Unexpected error:', err)

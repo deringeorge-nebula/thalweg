@@ -1,155 +1,86 @@
-import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { standardRatelimit, getClientIp } from '@/lib/ratelimit'
+import { NextResponse } from 'next/server'
 
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: Request) {
-  const ip = getClientIp(request)
-  const { success } = await standardRatelimit.limit(ip)
-  if (!success) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded. Please try again in a minute.' },
-      { status: 429 }
+interface RiskEvent {
+  id: string
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
+  category: 'DARK FLEET' | 'ANOMALY' | 'ROUTE RISK' | 'SANCTIONS' | 'PIRACY'
+  title: string
+  region: string
+  detail: string
+  timestamp: string
+  mmsi?: string
+  lat?: number
+  lon?: number
+}
+
+interface AnomalyRow {
+  id: string
+  severity: string | null
+  title: string | null
+  description: string | null
+  mmsi: string | null
+  lat: number | null
+  lon: number | null
+  detected_at: string | null
+}
+
+function deriveRegion(lat?: number | null, lon?: number | null): string {
+  if (lat == null || lon == null) return 'GLOBAL'
+  if (lat >= 10 && lat <= 30 && lon >= 32 && lon <= 45) return 'RED SEA'
+  if (lat >= 22 && lat <= 30 && lon >= 48 && lon <= 60) return 'PERSIAN GULF'
+  if (lat >= 30 && lat <= 47 && lon >= -6 && lon <= 37) return 'MEDITERRANEAN'
+  if (lat >= -40 && lat <= 25 && lon >= 40 && lon <= 100) return 'INDIAN OCEAN'
+  if (lat >= -60 && lat <= 70 && lon >= -80 && lon <= 0) return 'ATLANTIC'
+  if (lat >= -60 && lat <= 70 && (lon >= 120 || lon <= -120)) return 'PACIFIC'
+  return 'GLOBAL'
+}
+
+export async function GET() {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
-  }
 
-  const { searchParams } = new URL(request.url)
+    const { data, error } = await supabase
+      .from('anomalies')
+      .select('id, severity, title, description, mmsi, lat, lon, detected_at')
+      .eq('anomaly_type', 'DARK_VESSEL')
+      .eq('resolved', false)
+      .eq('false_positive', false)
+      .in('severity', ['MEDIUM', 'LOW'])
+      .not('lat', 'is', null)
+      .not('lon', 'is', null)
+      .order('detected_at', { ascending: false })
+      .limit(50)
 
-  // Extract parameters
-  const severity = searchParams.get('severity')
-  const typeParam = searchParams.get('type')
-  const limitParam = searchParams.get('limit')
-  const offsetParam = searchParams.get('offset')
-
-  // Validation
-  const validSeverities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
-  if (severity && !validSeverities.includes(severity)) {
-    return NextResponse.json(
-      { error: 'Invalid severity', message: 'Must be one of: LOW | MEDIUM | HIGH | CRITICAL' },
-      { status: 400 }
-    )
-  }
-
-  const validTypes = ['DARK_VESSEL', 'SPOOFING', 'SPEED_ANOMALY', 'STS_TRANSFER', 'MPA_VIOLATION', 'CASCADE']
-  if (typeParam && !validTypes.includes(typeParam)) {
-    return NextResponse.json(
-      { error: 'Invalid type', message: 'Must be one of: DARK_VESSEL | SPOOFING | SPEED_ANOMALY | STS_TRANSFER | MPA_VIOLATION | CASCADE' },
-      { status: 400 }
-    )
-  }
-
-  let limit = 100
-  if (limitParam) {
-    const parsed = parseInt(limitParam, 10)
-    if (!isNaN(parsed)) limit = parsed
-  }
-  if (limit < 1) limit = 1
-  if (limit > 500) limit = 500
-
-  let offset = 0
-  if (offsetParam) {
-    const parsed = parseInt(offsetParam, 10)
-    if (!isNaN(parsed)) offset = parsed
-  }
-  if (offset < 0) offset = 0
-
-  // Create isolated Supabase service role client
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.MY_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  )
-
-  // 1. Total Count Query (with filters)
-  let countQuery = supabase
-    .from('vessels')
-    .select('*', { count: 'exact', head: true })
-    .eq('resolved', false)
-    .eq('false_positive', false)
-
-  // 2. Data Query (with filters, sort, limit, offset)
-  let dataQuery = supabase
-    .from('vessels')
-    .select('mmsi, lat, lon, sog, cog, vessel_type, name, flag, nav_status, updated_at')
-    .eq('resolved', false)
-    .eq('false_positive', false)
-
-  // Apply dynamic filters
-  if (severity) {
-    countQuery = countQuery.eq('severity', severity)
-    dataQuery = dataQuery.eq('severity', severity)
-  }
-
-  if (typeParam) {
-    countQuery = countQuery.eq('anomaly_type', typeParam)
-    dataQuery = dataQuery.eq('anomaly_type', typeParam)
-  }
-
-  dataQuery = dataQuery
-    // Assuming Postgres ENUM is used for severity to match the DB order natively
-    .order('severity', { ascending: false })
-    .order('detected_at', { ascending: false })
-    .range(offset, offset + limit - 1)
-
-  // 3. Meta Counts — explicit queries for CRITICAL and HIGH to bypass PostgREST GROUP BY limitation
-  const criticalCountQuery = supabase
-    .from('vessels')
-    .select('*', { count: 'exact', head: true })
-    .eq('resolved', false)
-    .eq('false_positive', false)
-    .eq('severity', 'CRITICAL')
-
-  const highCountQuery = supabase
-    .from('vessels')
-    .select('*', { count: 'exact', head: true })
-    .eq('resolved', false)
-    .eq('false_positive', false)
-    .eq('severity', 'HIGH')
-
-  // Run all queries concurrently
-  const [
-    { count: total, error: countErr },
-    { data: anomalies, error: dataErr },
-    { count: criticalCount, error: criticalErr },
-    { count: highCount, error: highErr }
-  ] = await Promise.all([
-    countQuery,
-    dataQuery,
-    criticalCountQuery,
-    highCountQuery
-  ])
-
-  // Process standard DB errors
-  if (countErr) return NextResponse.json({ error: 'Database error', message: countErr.message }, { status: 500 })
-  if (dataErr) return NextResponse.json({ error: 'Database error', message: dataErr.message }, { status: 500 })
-  if (criticalErr) return NextResponse.json({ error: 'Database error', message: criticalErr.message }, { status: 500 })
-  if (highErr) return NextResponse.json({ error: 'Database error', message: highErr.message }, { status: 500 })
-
-  // Construct precise payload contract
-  const payload = {
-    anomalies: anomalies || [],
-    pagination: {
-      total: total || 0,
-      limit,
-      offset,
-      has_more: (total || 0) > offset + limit
-    },
-    filters: {
-      severity: severity || null,
-      type: typeParam || null
-    },
-    meta: {
-      generated_at: new Date().toISOString(),
-      critical_count: criticalCount || 0,
-      high_count: highCount || 0
+    if (error) {
+      console.error('[anomalies] Supabase error:', error)
+      return NextResponse.json([], { status: 200 })
     }
+
+    const events: RiskEvent[] = (data ?? []).map((v: AnomalyRow): RiskEvent => ({
+      id: `anomaly-${v.id}`,
+      severity: (v.severity as RiskEvent['severity']) ?? 'MEDIUM',
+      category: 'ANOMALY',
+      title: v.title ?? `VESSEL ANOMALY — MMSI ${v.mmsi ?? 'UNKNOWN'}`,
+      region: deriveRegion(v.lat, v.lon),
+      detail: v.description ?? 'Vessel anomaly detected.',
+      timestamp: v.detected_at ?? new Date().toISOString(),
+      mmsi: v.mmsi ?? undefined,
+      lat: v.lat ?? undefined,
+      lon: v.lon ?? undefined,
+    }))
+
+    return NextResponse.json(events, {
+      headers: { 'Cache-Control': 's-maxage=60, stale-while-revalidate=30' },
+    })
+  } catch (err) {
+    console.error('[anomalies] Unexpected error:', err)
+    return NextResponse.json([], { status: 200 })
   }
-
-  const response = NextResponse.json(payload, { status: 200 })
-
-  // Caching: Anomaly updates run roughly every 10 min — 30s cache is highly efficient and safe
-  response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60')
-
-  return response
 }
