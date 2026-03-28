@@ -1,99 +1,111 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { Resend } from 'resend';
+import { Resend } from 'resend'
+import { NextRequest, NextResponse } from 'next/server'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.MY_SERVICE_ROLE_KEY!
-);
+export const runtime = 'nodejs'
 
-const resend = new Resend(process.env.RESEND_API_KEY!);
+interface DemoRequestBody {
+  name: string
+  organization: string
+  role: string
+  email: string
+  useCase: string
+  message: string
+}
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json();
-    const { name, email, organization, role, use_case, tier_interest } = body;
+    const body: DemoRequestBody = await req.json()
 
-    // Validate required fields
+    const { name, organization, role, email, useCase, message } = body
+
     if (
-      !name || typeof name !== 'string' || name.length < 2 ||
-      !email || typeof email !== 'string' || email.length < 2 ||
-      !organization || typeof organization !== 'string' || organization.length < 2 ||
-      !use_case || typeof use_case !== 'string' || use_case.length < 2
+      !name?.trim() ||
+      !organization?.trim() ||
+      !role?.trim() ||
+      !email?.trim() ||
+      !useCase?.trim()
     ) {
-      return NextResponse.json({ error: 'Invalid form data' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'MISSING REQUIRED FIELDS' },
+        { status: 400 }
+      )
     }
 
-    // Validate email basic regex
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      return NextResponse.json({ error: 'Invalid form data' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'INVALID EMAIL ADDRESS' },
+        { status: 400 }
+      )
     }
 
-    // Insert into Supabase
-    const { error: dbError } = await supabaseAdmin
-      .from('demo_requests')
-      .insert({
-        name,
-        email,
-        organization,
-        role,
-        use_case,
-        tier_interest
-      });
+    const resend = new Resend(process.env.RESEND_API_KEY)
+    const subject = `[THALWEG] Demo Request — ${organization} · ${name}`
 
-    if (dbError) {
-      console.error('[demo-request API] Supabase error:', dbError);
-      return NextResponse.json({ error: 'Failed to save request' }, { status: 500 });
+    const htmlBody = `
+      <div style="font-family: monospace; background-color: #0a0f1e; color: #e2e8f0; padding: 32px;">
+        <h2 style="color: #00d4ff; font-weight: normal; margin-bottom: 24px;">${subject}</h2>
+        <table style="width: 100%; text-align: left; border-collapse: collapse;">
+          <tbody>
+            <tr>
+              <th style="padding: 8px 0; min-width: 150px; color: #94a3b8; font-weight: normal;">FULL NAME:</th>
+              <td style="padding: 8px 0; color: #e2e8f0;">${name}</td>
+            </tr>
+            <tr>
+              <th style="padding: 8px 0; color: #94a3b8; font-weight: normal;">ORGANIZATION:</th>
+              <td style="padding: 8px 0; color: #e2e8f0;">${organization}</td>
+            </tr>
+            <tr>
+              <th style="padding: 8px 0; color: #94a3b8; font-weight: normal;">ROLE:</th>
+              <td style="padding: 8px 0; color: #e2e8f0;">${role}</td>
+            </tr>
+            <tr>
+              <th style="padding: 8px 0; color: #94a3b8; font-weight: normal;">EMAIL:</th>
+              <td style="padding: 8px 0; color: #e2e8f0;">${email}</td>
+            </tr>
+            <tr>
+              <th style="padding: 8px 0; color: #94a3b8; font-weight: normal;">USE CASE:</th>
+              <td style="padding: 8px 0; color: #e2e8f0;">${useCase}</td>
+            </tr>
+            <tr>
+              <th style="padding: 8px 0; color: #94a3b8; font-weight: normal; vertical-align: top;">MESSAGE:</th>
+              <td style="padding: 8px 0; color: #e2e8f0;">${message || '(none)'}</td>
+            </tr>
+            <tr>
+              <th style="padding: 8px 0; color: #94a3b8; font-weight: normal;">SUBMITTED AT:</th>
+              <td style="padding: 8px 0; color: #e2e8f0;">${new Date().toISOString()}</td>
+            </tr>
+          </tbody>
+        </table>
+        
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #1a2744; color: #64748b; font-size: 12px;">
+          Reply to this email to respond directly to the requester.
+        </div>
+      </div>
+    `
+
+    const { error } = await resend.emails.send({
+      from: 'onboarding@resend.dev',
+      to: process.env.DEMO_NOTIFICATION_EMAIL ?? 'oriphicwaves@gmail.com',
+      replyTo: email,
+      subject,
+      html: htmlBody,
+    })
+
+    if (error) {
+      console.error('[demo-request] Resend error:', error)
+      return NextResponse.json(
+        { success: false, error: 'EMAIL DELIVERY FAILED' },
+        { status: 500 }
+      )
     }
 
-    // Send notification email to founder
-    try {
-      await resend.emails.send({
-        from: 'Thalweg <noreply@thalweg.vercel.app>',
-        to: 'oriphicwaves@gmail.com',    
-        subject: `Demo Request: ${organization} — ${tier_interest || 'unspecified'}`,
-        html: `
-          <h2>New Demo Request</h2>
-          <p><strong>Name:</strong> ${name}</p>
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Organization:</strong> ${organization}</p>
-          <p><strong>Role:</strong> ${role ?? 'Not specified'}</p>
-          <p><strong>Tier Interest:</strong> ${tier_interest ?? 'Not specified'}</p>
-          <p><strong>Use Case:</strong></p>
-          <p>${use_case}</p>
-        `
-      });
-    } catch (e) {
-      console.error('[demo-request API] Failed to send founder email:', e);
-    }
-
-    // Send confirmation to requester
-    try {
-      await resend.emails.send({
-        from: 'Thalweg <noreply@thalweg.vercel.app>',
-        to: email,
-        subject: 'Demo request received — Thalweg Maritime Intelligence',
-        html: `
-          <div style="font-family:monospace;background:#0a0f1e;color:#e2e8f0;padding:32px;max-width:480px">
-            <h2 style="color:#00d4ff;letter-spacing:4px">THALWEG</h2>
-            <p>Hi ${name},</p>
-            <p>Your demo request for ${organization} has been received. We'll be in touch within 48 hours.</p>
-            <p style="color:#64748b;font-size:12px">
-              Thalweg Maritime Intelligence<br>
-              https://thalweg.vercel.app
-            </p>
-          </div>
-        `
-      });
-    } catch (e) {
-      console.error('[demo-request API] Failed to send user confirmation email:', e);
-    }
-
-    return NextResponse.json({ success: true }, { status: 200 });
-
+    return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {
-    console.error('[demo-request API] General error:', error);
-    return NextResponse.json({ error: 'Bad request' }, { status: 400 });
+    console.error('[demo-request] Resend error:', error)
+    return NextResponse.json(
+      { success: false, error: 'EMAIL DELIVERY FAILED' },
+      { status: 500 }
+    )
   }
 }
