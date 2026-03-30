@@ -8,20 +8,6 @@ export const maxDuration = 60
 interface RegionBounds {
     latMin: number; latMax: number
     lonMin: number; lonMax: number
-    lonWrap?: boolean
-}
-
-type LonFilterQuery = {
-    gte: (col: string, val: number) => LonFilterQuery
-    lte: (col: string, val: number) => LonFilterQuery
-    or: (filter: string) => LonFilterQuery
-}
-
-const applyLonFilter = <T extends LonFilterQuery>(query: T, bounds: RegionBounds): T => {
-    if (bounds.lonWrap) {
-        return query.or(`lon.gte.${bounds.lonMin},lon.lte.${bounds.lonMax}`) as T
-    }
-    return query.gte('lon', bounds.lonMin).lte('lon', bounds.lonMax) as T
 }
 
 const REGION_BOUNDS: Record<string, RegionBounds> = {
@@ -31,7 +17,7 @@ const REGION_BOUNDS: Record<string, RegionBounds> = {
     'PERSIAN GULF': { latMin: 22, latMax: 30, lonMin: 48, lonMax: 60 },
     'MEDITERRANEAN': { latMin: 30, latMax: 47, lonMin: -6, lonMax: 42 },
     'ATLANTIC': { latMin: -60, latMax: 70, lonMin: -80, lonMax: 20 },
-    'PACIFIC': { latMin: -60, latMax: 70, lonMin: 120, lonMax: -70, lonWrap: true },
+    'PACIFIC': { latMin: -60, latMax: 70, lonMin: 120, lonMax: -70 },
 }
 
 export async function POST(request: NextRequest) {
@@ -41,9 +27,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}))
-    const targetRegion: string = body.region
-    if (!targetRegion || !REGION_BOUNDS[targetRegion]) {
-        return NextResponse.json({ error: 'region is required', valid: Object.keys(REGION_BOUNDS) }, { status: 400 })
+    const region: string = body.region
+    if (!region || !REGION_BOUNDS[region]) {
+        return NextResponse.json({
+            error: 'region is required',
+            valid: Object.keys(REGION_BOUNDS)
+        }, { status: 400 })
     }
 
     const supabase = createClient(
@@ -53,7 +42,6 @@ export async function POST(request: NextRequest) {
     )
 
     const today = new Date().toISOString().split('T')[0]
-    const region = targetRegion
 
     // Skip if already generated today
     const { data: existing } = await supabase
@@ -65,65 +53,49 @@ export async function POST(request: NextRequest) {
         .maybeSingle()
 
     if (existing) {
-        return NextResponse.json({ date: today, results: [{ region, status: 'skipped', reason: 'already generated today' }] })
+        return NextResponse.json({
+            date: today,
+            results: [{ region, status: 'skipped', reason: 'already generated today' }]
+        })
     }
 
     const bounds = REGION_BOUNDS[region]
+    const isGlobal = region === 'GLOBAL'
 
-    const [darkFleetRes, piracyRes, anomaliesRes, stsRes] = await Promise.allSettled([
-        applyLonFilter(
-            supabase.from('vessels')
-                .select('vessel_name, mmsi, dark_fleet_score, flag_state', { count: 'exact' })
-                .gte('dark_fleet_score', 60).not('lat', 'is', null)
-                .gte('lat', bounds.latMin).lte('lat', bounds.latMax),
-            bounds
-        ).order('dark_fleet_score', { ascending: false }).limit(5),
+    // Fast lightweight queries — counts only, no full table scans
+    const [darkFleetRes, piracyRes, anomalyRes, stsRes] = await Promise.allSettled([
+        isGlobal
+            ? supabase.from('vessels').select('*', { count: 'exact', head: true }).gte('dark_fleet_score', 60)
+            : supabase.from('vessels').select('*', { count: 'exact', head: true })
+                .gte('dark_fleet_score', 60)
+                .gte('lat', bounds.latMin).lte('lat', bounds.latMax)
+                .gte('lon', bounds.lonMin).lte('lon', bounds.lonMax),
 
-        applyLonFilter(
-            supabase.from('piracy_incidents')
-                .select('area, attack_type', { count: 'exact' })
-                .gte('lat', bounds.latMin).lte('lat', bounds.latMax),
-            bounds
-        ).order('incident_date', { ascending: false }).limit(5),
+        isGlobal
+            ? supabase.from('piracy_incidents').select('*', { count: 'exact', head: true })
+            : supabase.from('piracy_incidents').select('*', { count: 'exact', head: true })
+                .gte('lat', bounds.latMin).lte('lat', bounds.latMax)
+                .gte('lon', bounds.lonMin).lte('lon', bounds.lonMax),
 
-        applyLonFilter(
-            supabase.from('anomalies')
-                .select('mmsi, anomaly_type', { count: 'exact' })
-                .eq('resolved', false).not('lat', 'is', null)
-                .gte('lat', bounds.latMin).lte('lat', bounds.latMax),
-            bounds
-        ).limit(5),
+        isGlobal
+            ? supabase.from('anomalies').select('*', { count: 'exact', head: true }).eq('resolved', false)
+            : supabase.from('anomalies').select('*', { count: 'exact', head: true })
+                .eq('resolved', false)
+                .gte('lat', bounds.latMin).lte('lat', bounds.latMax)
+                .gte('lon', bounds.lonMin).lte('lon', bounds.lonMax),
 
-        applyLonFilter(
-            supabase.from('sts_events')
-                .select('mmsi1, mmsi2, risk_score', { count: 'exact' })
-                .eq('is_active', true).not('lat', 'is', null)
-                .gte('lat', bounds.latMin).lte('lat', bounds.latMax),
-            bounds
-        ).limit(5),
+        isGlobal
+            ? supabase.from('sts_events').select('*', { count: 'exact', head: true }).eq('is_active', true)
+            : supabase.from('sts_events').select('*', { count: 'exact', head: true })
+                .eq('is_active', true)
+                .gte('lat', bounds.latMin).lte('lat', bounds.latMax)
+                .gte('lon', bounds.lonMin).lte('lon', bounds.lonMax),
     ])
 
-    const darkFleet = darkFleetRes.status === 'fulfilled' ? darkFleetRes.value : null
-    const piracy = piracyRes.status === 'fulfilled' ? piracyRes.value : null
-    const anomalies = anomaliesRes.status === 'fulfilled' ? anomaliesRes.value : null
-    const sts = stsRes.status === 'fulfilled' ? stsRes.value : null
-
-    const darkFleetCount = darkFleet?.count ?? 0
-    const piracyCount = piracy?.count ?? 0
-    const anomalyCount = anomalies?.count ?? 0
-    const stsCount = sts?.count ?? 0
-
-    const darkFleetList = darkFleet?.data?.length
-        ? darkFleet.data.map((v: { vessel_name?: string; mmsi: string; dark_fleet_score: number; flag_state?: string }) =>
-            `  - ${v.vessel_name ?? 'Unknown'} (MMSI: ${v.mmsi}, Score: ${v.dark_fleet_score}, Flag: ${v.flag_state ?? 'Unknown'})`
-        ).join('\n')
-        : null
-
-    const piracyList = piracy?.data?.length
-        ? piracy.data.map((p: { attack_type: string; area: string }) =>
-            `  - ${p.attack_type} in ${p.area}`
-        ).join('\n')
-        : null
+    const darkFleetCount = darkFleetRes.status === 'fulfilled' ? (darkFleetRes.value.count ?? 0) : 0
+    const piracyCount = piracyRes.status === 'fulfilled' ? (piracyRes.value.count ?? 0) : 0
+    const anomalyCount = anomalyRes.status === 'fulfilled' ? (anomalyRes.value.count ?? 0) : 0
+    const stsCount = stsRes.status === 'fulfilled' ? (stsRes.value.count ?? 0) : 0
 
     const prompt = `You are a maritime intelligence analyst. Generate a concise intelligence brief for the ${region} region.
 
@@ -132,8 +104,6 @@ LIVE DATA (as of ${new Date().toUTCString()}):
 - Active piracy incidents: ${piracyCount}
 - Active vessel anomalies: ${anomalyCount}
 - Active STS transfers: ${stsCount}
-${darkFleetList ? `\nTop dark fleet vessels:\n${darkFleetList}` : ''}
-${piracyList ? `\nRecent piracy incidents:\n${piracyList}` : ''}
 
 Respond ONLY with valid JSON:
 {
@@ -141,26 +111,44 @@ Respond ONLY with valid JSON:
   "summary": "2-3 sentence intelligence summary with key findings",
   "severity": "CRITICAL or HIGH or MEDIUM or LOW",
   "category": "REGIONAL ASSESSMENT",
-  "full_brief": "4-6 sentence detailed brief covering threat landscape, notable vessels, and operational implications"
+  "full_brief": "4-6 sentence detailed brief covering threat landscape and operational implications"
 }`
 
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            messages: [{ role: 'user', content: prompt }],
-            response_format: { type: 'json_object' },
-            temperature: 0.3,
-            max_tokens: 400,
-        }),
-    })
+    // Hard 8s abort — stays well inside Vercel Hobby 10s limit
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
+
+    let groqRes: Response
+    try {
+        groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: 'llama-3.3-70b-versatile',
+                messages: [{ role: 'user', content: prompt }],
+                response_format: { type: 'json_object' },
+                temperature: 0.3,
+                max_tokens: 350,
+            }),
+            signal: controller.signal,
+        })
+    } catch {
+        clearTimeout(timeout)
+        return NextResponse.json({
+            date: today,
+            results: [{ region, status: 'error', reason: 'Groq request timed out or failed' }]
+        })
+    }
+    clearTimeout(timeout)
 
     if (!groqRes.ok) {
-        return NextResponse.json({ date: today, results: [{ region, status: 'error', reason: `Groq ${groqRes.status}` }] })
+        return NextResponse.json({
+            date: today,
+            results: [{ region, status: 'error', reason: `Groq HTTP ${groqRes.status}` }]
+        })
     }
 
     const groqData = await groqRes.json()
@@ -169,7 +157,10 @@ Respond ONLY with valid JSON:
     try {
         content = JSON.parse(groqData.choices[0].message.content)
     } catch {
-        return NextResponse.json({ date: today, results: [{ region, status: 'error', reason: 'Failed to parse Groq response' }] })
+        return NextResponse.json({
+            date: today,
+            results: [{ region, status: 'error', reason: 'Failed to parse Groq JSON response' }]
+        })
     }
 
     const { error: insertError } = await supabase
@@ -180,7 +171,12 @@ Respond ONLY with valid JSON:
             date: today,
             content: {
                 ...content,
-                data_points: { dark_fleet: darkFleetCount, piracy: piracyCount, anomalies: anomalyCount, sts: stsCount },
+                data_points: {
+                    dark_fleet: darkFleetCount,
+                    piracy: piracyCount,
+                    anomalies: anomalyCount,
+                    sts: stsCount,
+                },
             },
             model_used: 'llama-3.3-70b-versatile',
             input_tokens: groqData.usage?.prompt_tokens ?? 0,
@@ -188,9 +184,11 @@ Respond ONLY with valid JSON:
             is_fallback: false,
         })
 
-    const result = insertError
-        ? { region, status: 'error', reason: insertError.message }
-        : { region, status: 'generated' }
-
-    return NextResponse.json({ date: today, results: [result] })
+    return NextResponse.json({
+        date: today,
+        results: [insertError
+            ? { region, status: 'error', reason: insertError.message }
+            : { region, status: 'generated' }
+        ]
+    })
 }
