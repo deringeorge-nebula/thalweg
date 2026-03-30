@@ -5,20 +5,12 @@ import { createClient } from '@supabase/supabase-js'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-interface RegionBounds {
-    latMin: number; latMax: number
-    lonMin: number; lonMax: number
-}
+const VALID_REGIONS = [
+    'GLOBAL', 'INDIAN OCEAN', 'RED SEA',
+    'PERSIAN GULF', 'MEDITERRANEAN', 'ATLANTIC', 'PACIFIC'
+] as const
 
-const REGION_BOUNDS: Record<string, RegionBounds> = {
-    'GLOBAL': { latMin: -90, latMax: 90, lonMin: -180, lonMax: 180 },
-    'INDIAN OCEAN': { latMin: -40, latMax: 30, lonMin: 20, lonMax: 110 },
-    'RED SEA': { latMin: 12, latMax: 30, lonMin: 32, lonMax: 44 },
-    'PERSIAN GULF': { latMin: 22, latMax: 30, lonMin: 48, lonMax: 60 },
-    'MEDITERRANEAN': { latMin: 30, latMax: 47, lonMin: -6, lonMax: 42 },
-    'ATLANTIC': { latMin: -60, latMax: 70, lonMin: -80, lonMax: 20 },
-    'PACIFIC': { latMin: -60, latMax: 70, lonMin: 120, lonMax: -70 },
-}
+type ValidRegion = typeof VALID_REGIONS[number]
 
 export async function POST(request: NextRequest) {
     const auth = request.headers.get('authorization')
@@ -28,11 +20,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}))
     const region: string = body.region
-    if (!region || !REGION_BOUNDS[region]) {
-        return NextResponse.json({
-            error: 'region is required',
-            valid: Object.keys(REGION_BOUNDS)
-        }, { status: 400 })
+    if (!region || !VALID_REGIONS.includes(region as ValidRegion)) {
+        return NextResponse.json({ error: 'region is required', valid: VALID_REGIONS }, { status: 400 })
     }
 
     const supabase = createClient(
@@ -43,7 +32,6 @@ export async function POST(request: NextRequest) {
 
     const today = new Date().toISOString().split('T')[0]
 
-    // Skip if already generated today
     const { data: existing } = await supabase
         .from('intelligence_briefs')
         .select('id')
@@ -59,62 +47,19 @@ export async function POST(request: NextRequest) {
         })
     }
 
-    const bounds = REGION_BOUNDS[region]
-    const isGlobal = region === 'GLOBAL'
+    const prompt = `You are a senior maritime intelligence analyst at a global risk firm. Today is ${new Date().toUTCString()}.
 
-    // Fast lightweight queries — counts only, no full table scans
-    const [darkFleetRes, piracyRes, anomalyRes, stsRes] = await Promise.allSettled([
-        isGlobal
-            ? supabase.from('vessels').select('*', { count: 'exact', head: true }).gte('dark_fleet_score', 60)
-            : supabase.from('vessels').select('*', { count: 'exact', head: true })
-                .gte('dark_fleet_score', 60)
-                .gte('lat', bounds.latMin).lte('lat', bounds.latMax)
-                .gte('lon', bounds.lonMin).lte('lon', bounds.lonMax),
-
-        isGlobal
-            ? supabase.from('piracy_incidents').select('*', { count: 'exact', head: true })
-            : supabase.from('piracy_incidents').select('*', { count: 'exact', head: true })
-                .gte('lat', bounds.latMin).lte('lat', bounds.latMax)
-                .gte('lon', bounds.lonMin).lte('lon', bounds.lonMax),
-
-        isGlobal
-            ? supabase.from('anomalies').select('*', { count: 'exact', head: true }).eq('resolved', false)
-            : supabase.from('anomalies').select('*', { count: 'exact', head: true })
-                .eq('resolved', false)
-                .gte('lat', bounds.latMin).lte('lat', bounds.latMax)
-                .gte('lon', bounds.lonMin).lte('lon', bounds.lonMax),
-
-        isGlobal
-            ? supabase.from('sts_events').select('*', { count: 'exact', head: true }).eq('is_active', true)
-            : supabase.from('sts_events').select('*', { count: 'exact', head: true })
-                .eq('is_active', true)
-                .gte('lat', bounds.latMin).lte('lat', bounds.latMax)
-                .gte('lon', bounds.lonMin).lte('lon', bounds.lonMax),
-    ])
-
-    const darkFleetCount = darkFleetRes.status === 'fulfilled' ? (darkFleetRes.value.count ?? 0) : 0
-    const piracyCount = piracyRes.status === 'fulfilled' ? (piracyRes.value.count ?? 0) : 0
-    const anomalyCount = anomalyRes.status === 'fulfilled' ? (anomalyRes.value.count ?? 0) : 0
-    const stsCount = stsRes.status === 'fulfilled' ? (stsRes.value.count ?? 0) : 0
-
-    const prompt = `You are a maritime intelligence analyst. Generate a concise intelligence brief for the ${region} region.
-
-LIVE DATA (as of ${new Date().toUTCString()}):
-- Dark fleet vessels (score ≥60): ${darkFleetCount}
-- Active piracy incidents: ${piracyCount}
-- Active vessel anomalies: ${anomalyCount}
-- Active STS transfers: ${stsCount}
+Generate a current intelligence brief for the ${region} region based on known maritime threat patterns, geopolitical context, and typical activity for this time of year.
 
 Respond ONLY with valid JSON:
 {
-  "title": "Brief headline, max 10 words",
-  "summary": "2-3 sentence intelligence summary with key findings",
+  "title": "Concise headline, max 10 words",
+  "summary": "2-3 sentences covering the primary threat picture for this region right now",
   "severity": "CRITICAL or HIGH or MEDIUM or LOW",
   "category": "REGIONAL ASSESSMENT",
-  "full_brief": "4-6 sentence detailed brief covering threat landscape and operational implications"
+  "full_brief": "4-5 sentences covering: threat landscape, key chokepoints or risk zones, dark fleet or sanctions activity patterns, and operational recommendations for vessels transiting this region"
 }`
 
-    // Hard 8s abort — stays well inside Vercel Hobby 10s limit
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 8000)
 
@@ -130,7 +75,7 @@ Respond ONLY with valid JSON:
                 model: 'llama-3.3-70b-versatile',
                 messages: [{ role: 'user', content: prompt }],
                 response_format: { type: 'json_object' },
-                temperature: 0.3,
+                temperature: 0.4,
                 max_tokens: 350,
             }),
             signal: controller.signal,
@@ -139,7 +84,7 @@ Respond ONLY with valid JSON:
         clearTimeout(timeout)
         return NextResponse.json({
             date: today,
-            results: [{ region, status: 'error', reason: 'Groq request timed out or failed' }]
+            results: [{ region, status: 'error', reason: 'Groq timed out' }]
         })
     }
     clearTimeout(timeout)
@@ -159,7 +104,7 @@ Respond ONLY with valid JSON:
     } catch {
         return NextResponse.json({
             date: today,
-            results: [{ region, status: 'error', reason: 'Failed to parse Groq JSON response' }]
+            results: [{ region, status: 'error', reason: 'Failed to parse Groq response' }]
         })
     }
 
@@ -169,15 +114,7 @@ Respond ONLY with valid JSON:
             brief_type: 'region',
             region,
             date: today,
-            content: {
-                ...content,
-                data_points: {
-                    dark_fleet: darkFleetCount,
-                    piracy: piracyCount,
-                    anomalies: anomalyCount,
-                    sts: stsCount,
-                },
-            },
+            content,
             model_used: 'llama-3.3-70b-versatile',
             input_tokens: groqData.usage?.prompt_tokens ?? 0,
             output_tokens: groqData.usage?.completion_tokens ?? 0,
