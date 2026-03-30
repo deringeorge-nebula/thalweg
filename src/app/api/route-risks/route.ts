@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       { risks: data, count: data?.length ?? 0 },
       { headers: { 'Cache-Control': 'no-store' } }
     )
-  } catch (err) {
+  } catch {
     return NextResponse.json(
       { error: 'Invalid JSON body' },
       { status: 400 }

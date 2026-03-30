@@ -4,7 +4,15 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import dynamic from 'next/dynamic';
 
-const GlobeView = dynamic<any>(
+interface GlobeViewProps {
+  embedMode?: boolean;
+  initialLat?: number;
+  initialLon?: number;
+  initialZoom?: number;
+  embedFilter?: string | null;
+}
+
+const GlobeView = dynamic<GlobeViewProps>(
   () => import('@/components/globe/GlobeView'),
   {
     ssr: false,

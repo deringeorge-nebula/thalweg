@@ -59,7 +59,7 @@ export default function usePiracyData(): PiracyData {
       try {
         setLoading(true)
         setError(null)
-        
+
         // Execute queries concurrently
         const [incidentsResponse, riskZonesResponse] = await Promise.all([
           supabase
@@ -79,9 +79,9 @@ export default function usePiracyData(): PiracyData {
           setIncidents(incidentsResponse.data as unknown as PiracyIncident[])
           setRiskZones(riskZonesResponse.data as unknown as PiracyRiskZone[])
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (mounted) {
-          setError(err.message || 'Failed to fetch piracy data')
+          setError(err instanceof Error ? err.message : 'Failed to fetch piracy data')
         }
       } finally {
         if (mounted) {

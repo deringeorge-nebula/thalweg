@@ -40,7 +40,7 @@ export async function GET(
   // 1. Fetch Vessel
   const { data: vessel, error: vesselError } = await supabase
     .from('vessels')
-    .select('mmsi, lat, lon, sog, cog, vessel_type, name, flag, nav_status, updated_at, imo_number')
+    .select('mmsi, lat, lon, sog, cog, vessel_type, name, flag, nav_status, updated_at, imo_number, sanctions_match')
     .eq('mmsi', mmsi)
     .single()
 
@@ -106,7 +106,7 @@ export async function GET(
   }
 
   // If vessel is flagged sanctioned but no enriched record found, return structured fallback
-  const sanctionsResult = sanctions ?? ((vessel as any)?.sanctions_match === true
+  const sanctionsResult = sanctions ?? (vessel?.sanctions_match === true
     ? {
       note: 'Vessel flagged as sanctions match. Detailed record pending data enrichment.',
       confirmed: true,

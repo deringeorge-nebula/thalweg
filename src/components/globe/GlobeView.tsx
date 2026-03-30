@@ -5,8 +5,9 @@
 // DO NOT replace Float32Array with object arrays.
 // DO NOT add React state updates inside Realtime callbacks.
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import DeckGL from '@deck.gl/react';
 import { _GlobeView as GlobeView } from '@deck.gl/core';
 import { useVesselTrack } from '@/hooks/useVesselTrack';
@@ -23,7 +24,7 @@ import PiracyPanel from '../panels/PiracyPanel';
 import { useVesselStream } from '@/hooks/useVesselStream';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { VesselSearchBar } from './VesselSearchBar';
-import { hexToRgb, type VesselRow, type GlobeData, NAV_STATUS_LABELS } from '@/types/vessel';
+import { hexToRgb, type VesselRow, type GlobeData } from '@/types/vessel';
 import VesselPanel from './VesselPanel';
 import { usePortCongestion } from '@/hooks/usePortCongestion';
 import type { PortWithCongestion } from '@/hooks/usePortCongestion';
@@ -57,11 +58,6 @@ function sstColor(sst: number): [number, number, number, number] {
     return [220, 30, 30, 160];
 }
 
-const INITIAL_VIEW_STATE = {
-    longitude: 75,
-    latitude: 15,
-    zoom: 1.8,
-};
 
 const EMPTY_GLOBE_DATA: GlobeData = {
     positions: new Float32Array(0),
@@ -85,7 +81,7 @@ export default function GlobeViewComponent({
     initialZoom,
     embedFilter,
 }: GlobeViewProps = {}) {
-    const { vesselMapRef, totalCount, isLoading, dataFreshness, realtimeActiveRef } =
+    const { vesselMapRef, isLoading, dataFreshness, realtimeActiveRef } =
         useVesselStream();
 
     const [globeData, setGlobeData] = useState<GlobeData>(EMPTY_GLOBE_DATA);
@@ -96,10 +92,10 @@ export default function GlobeViewComponent({
         clearRoute, threats, isAnalyzing, threatCount
     } = useRouteRisk();
     const [selectedVessel, setSelectedVessel] = useState<VesselRow | null>(null);
-    const [comparedVessel, setComparedVessel] = useState<any>(null);
+    const [comparedVessel, setComparedVessel] = useState<VesselRow | null>(null);
     const [showCompare, setShowCompare] = useState(false);
     const [showWatchList, setShowWatchList] = useState(false);
-    const { watchList, isWatched } = useWatchList();
+    const { watchList } = useWatchList();
     const { track } = useVesselTrack(
         selectedVessel?.mmsi ? Number(selectedVessel.mmsi) : null
     );
@@ -122,7 +118,7 @@ export default function GlobeViewComponent({
     const [showSts, setShowSts] = useState(true);
 
     const darkFleetVessels = useMemo(
-        () => globeData.vessels.filter((v: any) => (v.darkFleetScore ?? v.dark_fleet_score ?? 0) >= 60),
+        () => globeData.vessels.filter((v: VesselRow) => (v.dark_fleet_score ?? 0) >= 60),
         [globeData.vessels]
     );
 
@@ -253,7 +249,7 @@ export default function GlobeViewComponent({
         }, 500);
 
         return () => clearInterval(interval);
-    }, [vesselMapRef, isDemoMode]);
+    }, [vesselMapRef, isDemoMode, embedMode, embedFilter]);
 
     useEffect(() => {
         if (!isDemoMode) return;
@@ -349,22 +345,22 @@ export default function GlobeViewComponent({
         : null
 
     const trackLayer = track.length > 1
-      ? new TripsLayer({
-          id: 'vessel-track',
-          data: [{
-            path: track.map(p => [p.lon, p.lat]),
-            timestamps: track.map((_, i) => i),
-          }],
-          getPath: (d: any) => d.path,
-          getTimestamps: (d: any) => d.timestamps,
-          getColor: [0, 212, 255],
-          opacity: 0.8,
-          widthMinPixels: 2,
-          trailLength: track.length,
-          currentTime: track.length,
-          shadowEnabled: false,
+        ? new TripsLayer({
+            id: 'vessel-track',
+            data: [{
+                path: track.map(p => [p.lon, p.lat]),
+                timestamps: track.map((_, i) => i),
+            }],
+            getPath: (d: any) => d.path,
+            getTimestamps: (d: any) => d.timestamps,
+            getColor: [0, 212, 255],
+            opacity: 0.8,
+            widthMinPixels: 2,
+            trailLength: track.length,
+            currentTime: track.length,
+            shadowEnabled: false,
         })
-      : null
+        : null
 
     const watchedMmsiSet = new Set(watchList.map(v => v.mmsi));
     const watchedVesselLayer = new ScatterplotLayer({
@@ -521,16 +517,16 @@ export default function GlobeViewComponent({
                 data: stsEvents,
                 getPosition: (d: StsEvent) => [d.lon, d.lat],
                 getRadius: (d: StsEvent) => {
-                  const s = d.risk_score ?? 0
-                  if (s >= 80) return 55000
-                  if (s >= 60) return 40000
-                  return 28000
+                    const s = d.risk_score ?? 0
+                    if (s >= 80) return 55000
+                    if (s >= 60) return 40000
+                    return 28000
                 },
                 getFillColor: (d: StsEvent) => {
-                  const s = d.risk_score ?? 0
-                  if (s >= 80) return [139, 92, 246, 220]  // purple — critical
-                  if (s >= 60) return [167, 139, 250, 190]  // light purple — high
-                  return [196, 181, 253, 150]               // pale purple — medium
+                    const s = d.risk_score ?? 0
+                    if (s >= 80) return [139, 92, 246, 220]  // purple — critical
+                    if (s >= 60) return [167, 139, 250, 190]  // light purple — high
+                    return [196, 181, 253, 150]               // pale purple — medium
                 },
                 getLineColor: [139, 92, 246, 200],
                 lineWidthMinPixels: 1.5,
@@ -539,21 +535,21 @@ export default function GlobeViewComponent({
                 radiusMaxPixels: 22,
                 pickable: true,
                 onClick: ({ object }: { object: StsEvent }) => {
-                  if (object?.mmsi1) {
-                    setShowWatchList(false)
-                    setSelectedPort(null)
-                    setSelectedPiracy(null)
-                    setSpillResult(null)
-                    // Find vessel in globeData by mmsi1 and select it
-                    const vessel = globeData.vessels.find(
-                      (v: VesselRow) => v.mmsi === object.mmsi1
-                    )
-                    if (vessel) setSelectedVessel(vessel)
-                  }
+                    if (object?.mmsi1) {
+                        setShowWatchList(false)
+                        setSelectedPort(null)
+                        setSelectedPiracy(null)
+                        setSpillResult(null)
+                        // Find vessel in globeData by mmsi1 and select it
+                        const vessel = globeData.vessels.find(
+                            (v: VesselRow) => v.mmsi === object.mmsi1
+                        )
+                        if (vessel) setSelectedVessel(vessel)
+                    }
                 },
                 updateTriggers: {
-                  getFillColor: stsEvents.length,
-                  getRadius: stsEvents.length,
+                    getFillColor: stsEvents.length,
+                    getRadius: stsEvents.length,
                 },
             })] : []),
 
@@ -671,370 +667,370 @@ export default function GlobeViewComponent({
 
             {/* ── Top status bar ─────────────────────────────────────────────────── */}
             {!embedMode && (
-            <>
-            <div className="fixed top-0 left-0 right-0 z-20 bg-[#0a0f1e]/95 backdrop-blur-sm border-b border-[#1a2744] px-3 sm:px-4 py-2 flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3">
-                <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="font-heading text-white font-bold text-lg tracking-wide">
-                        THALWEG
-                    </span>
-                    <span className="text-text-muted text-xs font-data hidden sm:block">
-                        MARITIME INTELLIGENCE
-                    </span>
-                </div>
-
-                <div className="relative w-32 sm:w-auto flex-shrink-0">
-                    <VesselSearchBar
-                        vessels={globeData.vessels}
-                        onVesselSelect={(vessel) => {
-                            setShowWatchList(false)
-                            setSelectedPort(null)
-                            setSelectedPiracy(null)
-                            setSpillResult(null)
-                            setSelectedVessel(vessel)
-                            trackVesselClick(
-                                vessel.mmsi,
-                                vessel.vessel_name ?? 'Unknown',
-                                vessel.is_anomaly ?? false,
-                                vessel.sanctions_match ?? false,
-                                vessel.dark_fleet_score ?? 0
-                            )
-                        }}
-                    />
-                </div>
-
-                {/* Vessel count + REALTIME */}
-                <div className="flex items-center gap-4 text-xs font-data hidden md:flex flex-shrink-0">
-                    {/* Live vessel count */}
-                    <div className="flex items-center gap-1.5">
-                        <div
-                            className={`w-2 h-2 rounded-full ${isLoading ? 'bg-alert-warning' : 'bg-alert-ok'}`}
-                            style={{ boxShadow: isLoading ? '0 0 6px #FFB800' : '0 0 6px #00FF88' }}
-                        />
-                        <span className="text-alert-ok font-bold">
-                            {globeData.count.toLocaleString()}
-                        </span>
-                        <span className="text-text-secondary">VESSELS</span>
-                    </div>
-
-                    {/* Realtime / polling indicator */}
-                    {isDemoMode && (
-                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded border border-[#eab308] bg-[#eab308]/10">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#eab308]" style={{ boxShadow: '0 0 4px #eab308' }} />
-                            <span className="text-[#eab308] text-xs font-data tracking-widest">
-                                DEMO
+                <>
+                    <div className="fixed top-0 left-0 right-0 z-20 bg-[#0a0f1e]/95 backdrop-blur-sm border-b border-[#1a2744] px-3 sm:px-4 py-2 flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3">
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                            <span className="font-heading text-white font-bold text-lg tracking-wide">
+                                THALWEG
+                            </span>
+                            <span className="text-text-muted text-xs font-data hidden sm:block">
+                                MARITIME INTELLIGENCE
                             </span>
                         </div>
-                    )}
-                    <div className="flex items-center gap-1.5">
-                        <div
-                            className={`w-1.5 h-1.5 rounded-full ${realtimeActiveRef.current ? 'bg-accent-cyan' : 'bg-alert-warning'}`}
-                        />
-                        <span className="text-text-secondary">
-                            {realtimeActiveRef.current ? 'REALTIME' : 'POLLING 30s'}
-                        </span>
-                    </div>
 
-                    {/* Data freshness */}
-                    {dataFreshness && (
-                        <span className="text-text-muted">
-                            {dataFreshness.toLocaleTimeString('en-GB', { hour12: false })} UTC
-                        </span>
-                    )}
-                </div>
+                        <div className="relative w-32 sm:w-auto flex-shrink-0">
+                            <VesselSearchBar
+                                vessels={globeData.vessels}
+                                onVesselSelect={(vessel) => {
+                                    setShowWatchList(false)
+                                    setSelectedPort(null)
+                                    setSelectedPiracy(null)
+                                    setSpillResult(null)
+                                    setSelectedVessel(vessel)
+                                    trackVesselClick(
+                                        vessel.mmsi,
+                                        vessel.vessel_name ?? 'Unknown',
+                                        vessel.is_anomaly ?? false,
+                                        vessel.sanctions_match ?? false,
+                                        vessel.dark_fleet_score ?? 0
+                                    )
+                                }}
+                            />
+                        </div>
 
-                {/* DESKTOP ONLY toggle buttons */}
-                <div className="hidden sm:flex items-center gap-2 md:gap-2 ml-auto">
-                    <button
-                        onClick={() => setIsRouteMode(!isRouteMode)}
-                        className={`
+                        {/* Vessel count + REALTIME */}
+                        <div className="flex items-center gap-4 text-xs font-data hidden md:flex flex-shrink-0">
+                            {/* Live vessel count */}
+                            <div className="flex items-center gap-1.5">
+                                <div
+                                    className={`w-2 h-2 rounded-full ${isLoading ? 'bg-alert-warning' : 'bg-alert-ok'}`}
+                                    style={{ boxShadow: isLoading ? '0 0 6px #FFB800' : '0 0 6px #00FF88' }}
+                                />
+                                <span className="text-alert-ok font-bold">
+                                    {globeData.count.toLocaleString()}
+                                </span>
+                                <span className="text-text-secondary">VESSELS</span>
+                            </div>
+
+                            {/* Realtime / polling indicator */}
+                            {isDemoMode && (
+                                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded border border-[#eab308] bg-[#eab308]/10">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-[#eab308]" style={{ boxShadow: '0 0 4px #eab308' }} />
+                                    <span className="text-[#eab308] text-xs font-data tracking-widest">
+                                        DEMO
+                                    </span>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-1.5">
+                                <div
+                                    className={`w-1.5 h-1.5 rounded-full ${realtimeActiveRef.current ? 'bg-accent-cyan' : 'bg-alert-warning'}`}
+                                />
+                                <span className="text-text-secondary">
+                                    {realtimeActiveRef.current ? 'REALTIME' : 'POLLING 30s'}
+                                </span>
+                            </div>
+
+                            {/* Data freshness */}
+                            {dataFreshness && (
+                                <span className="text-text-muted">
+                                    {dataFreshness.toLocaleTimeString('en-GB', { hour12: false })} UTC
+                                </span>
+                            )}
+                        </div>
+
+                        {/* DESKTOP ONLY toggle buttons */}
+                        <div className="hidden sm:flex items-center gap-2 md:gap-2 ml-auto">
+                            <button
+                                onClick={() => setIsRouteMode(!isRouteMode)}
+                                className={`
                             font-data min-h-[36px] sm:min-h-0 rounded border transition-colors touch-manipulation px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0
                             ${isRouteMode
-                                ? 'border-[#00d4ff] bg-[#00d4ff]/20 text-[#00d4ff]'
-                                : 'border-text-muted text-text-muted hover:border-[#00d4ff] hover:text-[#00d4ff]'
-                            }
+                                        ? 'border-[#00d4ff] bg-[#00d4ff]/20 text-[#00d4ff]'
+                                        : 'border-text-muted text-text-muted hover:border-[#00d4ff] hover:text-[#00d4ff]'
+                                    }
                         `}
-                    >
-                        {isRouteMode
-                            ? (waypoints.length === 0 ? <><span className="hidden sm:inline">⇧ CLICK </span>ORIGIN</>
-                                : waypoints.length === 1 ? <><span className="hidden sm:inline">⇧ CLICK </span>DEST</>
-                                    : `${threatCount} THREATS`)
-                            : 'ROUTE'
-                        }
-                    </button>
+                            >
+                                {isRouteMode
+                                    ? (waypoints.length === 0 ? <><span className="hidden sm:inline">⇧ CLICK </span>ORIGIN</>
+                                        : waypoints.length === 1 ? <><span className="hidden sm:inline">⇧ CLICK </span>DEST</>
+                                            : `${threatCount} THREATS`)
+                                    : 'ROUTE'
+                                }
+                            </button>
 
-                    <button
-                        onClick={() => setSstVisible((v) => !v)}
-                        className={`font-data min-h-[36px] sm:min-h-0 rounded border transition-colors touch-manipulation px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0 ${sstVisible
-                            ? 'border-accent-cyan text-accent-cyan'
-                            : 'border-text-muted text-text-muted'
-                            }`}
-                    >
-                        SST
-                    </button>
-                    <button
-                        onClick={() => setDarkFleetVisible((v) => !v)}
-                        className={`font-data min-h-[36px] sm:min-h-0 rounded border transition-colors touch-manipulation px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0 ${darkFleetVisible
-                            ? 'border-alert-critical text-alert-critical'
-                            : 'border-text-muted text-text-muted'
-                            }`}
-                    >
-                        DARK FLEET
-                    </button>
-                    {/* PIRACY button */}
-                    <button
-                        onClick={() => setShowPiracy(p => !p)}
-                        className={`font-data font-medium border transition-all touch-manipulation min-h-[36px] sm:min-h-0 rounded px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0 ${showPiracy
-                            ? 'bg-red-900/40 border-red-500 text-red-400'
-                            : 'bg-navy-950/40 border-gray-600 text-gray-400 hover:border-gray-400'
-                            }`}
-                    >
-                        PIRACY
-                    </button>
-                    <button
-                        onClick={() => setShowSts(s => !s)}
-                        className={`font-data font-medium border transition-all touch-manipulation min-h-[36px] sm:min-h-0 rounded px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0 ${showSts
-                            ? 'bg-[#8b5cf6]/20 border-[#8b5cf6] text-[#8b5cf6]'
-                            : 'bg-navy-950/40 border-gray-600 text-gray-400 hover:border-gray-400'
-                            }`}
-                    >
-                        STS
-                    </button>
-                    {/* DENSITY button */}
-                    <button
-                        onClick={() => setShowHeatmap(!showHeatmap)}
-                        className={`font-data font-medium border transition-all touch-manipulation min-h-[36px] sm:min-h-0 rounded px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0 ${showHeatmap
-                            ? 'bg-[#8b5cf6]/20 border-[#8b5cf6] text-[#8b5cf6]'
-                            : 'bg-navy-950/40 border-gray-600 text-gray-400 hover:border-gray-400'
-                            }`}
-                    >
-                        DENSITY
-                    </button>
-                    <button
-                        onClick={() => setShowWatchList(prev => {
-                            if (!prev) {
-                                // closing selected vessel if watchlist opens
-                                setSelectedVessel(null)
-                            }
-                            return !prev
-                        })}
-                        className={`font-mono tracking-widest text-[10px] px-3 py-1.5 transition-colors touch-manipulation border flex-shrink-0 ${showWatchList
-                            ? 'bg-[#00d4ff] text-[#0a0f1e] border-[#00d4ff]/30 hover:border-[#00d4ff]'
-                            : 'bg-transparent text-slate-400 hover:text-[#00d4ff] border-[#00d4ff]/30 hover:border-[#00d4ff]'
-                            }`}
-                    >
-                        {watchList.length === 0 ? 'WATCHLIST' : `WATCHLIST [${watchList.length}]`}
-                    </button>
-                </div>
+                            <button
+                                onClick={() => setSstVisible((v) => !v)}
+                                className={`font-data min-h-[36px] sm:min-h-0 rounded border transition-colors touch-manipulation px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0 ${sstVisible
+                                    ? 'border-accent-cyan text-accent-cyan'
+                                    : 'border-text-muted text-text-muted'
+                                    }`}
+                            >
+                                SST
+                            </button>
+                            <button
+                                onClick={() => setDarkFleetVisible((v) => !v)}
+                                className={`font-data min-h-[36px] sm:min-h-0 rounded border transition-colors touch-manipulation px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0 ${darkFleetVisible
+                                    ? 'border-alert-critical text-alert-critical'
+                                    : 'border-text-muted text-text-muted'
+                                    }`}
+                            >
+                                DARK FLEET
+                            </button>
+                            {/* PIRACY button */}
+                            <button
+                                onClick={() => setShowPiracy(p => !p)}
+                                className={`font-data font-medium border transition-all touch-manipulation min-h-[36px] sm:min-h-0 rounded px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0 ${showPiracy
+                                    ? 'bg-red-900/40 border-red-500 text-red-400'
+                                    : 'bg-navy-950/40 border-gray-600 text-gray-400 hover:border-gray-400'
+                                    }`}
+                            >
+                                PIRACY
+                            </button>
+                            <button
+                                onClick={() => setShowSts(s => !s)}
+                                className={`font-data font-medium border transition-all touch-manipulation min-h-[36px] sm:min-h-0 rounded px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0 ${showSts
+                                    ? 'bg-[#8b5cf6]/20 border-[#8b5cf6] text-[#8b5cf6]'
+                                    : 'bg-navy-950/40 border-gray-600 text-gray-400 hover:border-gray-400'
+                                    }`}
+                            >
+                                STS
+                            </button>
+                            {/* DENSITY button */}
+                            <button
+                                onClick={() => setShowHeatmap(!showHeatmap)}
+                                className={`font-data font-medium border transition-all touch-manipulation min-h-[36px] sm:min-h-0 rounded px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0 ${showHeatmap
+                                    ? 'bg-[#8b5cf6]/20 border-[#8b5cf6] text-[#8b5cf6]'
+                                    : 'bg-navy-950/40 border-gray-600 text-gray-400 hover:border-gray-400'
+                                    }`}
+                            >
+                                DENSITY
+                            </button>
+                            <button
+                                onClick={() => setShowWatchList(prev => {
+                                    if (!prev) {
+                                        // closing selected vessel if watchlist opens
+                                        setSelectedVessel(null)
+                                    }
+                                    return !prev
+                                })}
+                                className={`font-mono tracking-widest text-[10px] px-3 py-1.5 transition-colors touch-manipulation border flex-shrink-0 ${showWatchList
+                                    ? 'bg-[#00d4ff] text-[#0a0f1e] border-[#00d4ff]/30 hover:border-[#00d4ff]'
+                                    : 'bg-transparent text-slate-400 hover:text-[#00d4ff] border-[#00d4ff]/30 hover:border-[#00d4ff]'
+                                    }`}
+                            >
+                                {watchList.length === 0 ? 'WATCHLIST' : `WATCHLIST [${watchList.length}]`}
+                            </button>
+                        </div>
 
-                {/* MOBILE ONLY layers button */}
-                <button
-                    onClick={() => setLayersOpen(true)}
-                    className="flex sm:hidden items-center gap-1.5 ml-auto px-3 py-1.5 rounded border border-[#1a2744] bg-[#0d1424] hover:border-[#00d4ff] text-slate-300 text-[11px] font-data tracking-widest transition-colors touch-manipulation flex-shrink-0"
-                >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0">
-                        <rect x="0" y="2" width="14" height="1.5" rx="0.75" fill="currentColor"/>
-                        <rect x="0" y="6.25" width="14" height="1.5" rx="0.75" fill="currentColor"/>
-                        <rect x="0" y="10.5" width="14" height="1.5" rx="0.75" fill="currentColor"/>
-                    </svg>
-                    LAYERS
-                </button>
-            </div>
+                        {/* MOBILE ONLY layers button */}
+                        <button
+                            onClick={() => setLayersOpen(true)}
+                            className="flex sm:hidden items-center gap-1.5 ml-auto px-3 py-1.5 rounded border border-[#1a2744] bg-[#0d1424] hover:border-[#00d4ff] text-slate-300 text-[11px] font-data tracking-widest transition-colors touch-manipulation flex-shrink-0"
+                        >
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0">
+                                <rect x="0" y="2" width="14" height="1.5" rx="0.75" fill="currentColor" />
+                                <rect x="0" y="6.25" width="14" height="1.5" rx="0.75" fill="currentColor" />
+                                <rect x="0" y="10.5" width="14" height="1.5" rx="0.75" fill="currentColor" />
+                            </svg>
+                            LAYERS
+                        </button>
+                    </div>
 
-            {/* MOBILE LAYERS DRAWER */}
-            {layersOpen && (
-              <>
-                {/* Backdrop */}
-                <div 
-                  className="fixed inset-0 z-40 bg-black/60 sm:hidden"
-                  onClick={() => setLayersOpen(false)}
-                />
-                
-                {/* Drawer */}
-                <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-[#0a0f1e] border-t-2 border-[#00d4ff] rounded-t-2xl pb-safe">
-                  
-                  {/* Handle bar */}
-                  <div className="flex justify-center pt-3 pb-1">
-                    <div className="w-10 h-1 bg-[#1a2744] rounded-full" />
-                  </div>
+                    {/* MOBILE LAYERS DRAWER */}
+                    {layersOpen && (
+                        <>
+                            {/* Backdrop */}
+                            <div
+                                className="fixed inset-0 z-40 bg-black/60 sm:hidden"
+                                onClick={() => setLayersOpen(false)}
+                            />
 
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-5 py-3 border-b border-[#1a2744]">
-                    <span className="text-[#00d4ff] text-xs font-data tracking-widest">
-                      MAP LAYERS
-                    </span>
-                    <button 
-                      onClick={() => setLayersOpen(false)}
-                      className="text-slate-500 text-xs font-data hover:text-white touch-manipulation px-2 py-1">
-                      ✕
-                    </button>
-                  </div>
+                            {/* Drawer */}
+                            <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-[#0a0f1e] border-t-2 border-[#00d4ff] rounded-t-2xl pb-safe">
 
-                  {/* Layer rows */}
-                  <div className="px-4 py-3 space-y-1">
+                                {/* Handle bar */}
+                                <div className="flex justify-center pt-3 pb-1">
+                                    <div className="w-10 h-1 bg-[#1a2744] rounded-full" />
+                                </div>
 
-                    {/* ROUTE */}
-                    <button
-                      onClick={() => setIsRouteMode(!isRouteMode)}
-                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${isRouteMode
-                          ? 'border-[#00d4ff] bg-[#00d4ff]/10 text-[#00d4ff]'
-                          : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
-                        }`}
-                    >
-                      <span>ROUTE BUILDER</span>
-                      <span className={`text-xs px-2 py-0.5 rounded ${isRouteMode 
-                          ? 'bg-[#00d4ff]/20 text-[#00d4ff]' 
-                          : 'bg-[#1a2744] text-slate-600'}`}>
-                        {isRouteMode ? 'ON' : 'OFF'}
-                      </span>
-                    </button>
+                                {/* Header */}
+                                <div className="flex items-center justify-between px-5 py-3 border-b border-[#1a2744]">
+                                    <span className="text-[#00d4ff] text-xs font-data tracking-widest">
+                                        MAP LAYERS
+                                    </span>
+                                    <button
+                                        onClick={() => setLayersOpen(false)}
+                                        className="text-slate-500 text-xs font-data hover:text-white touch-manipulation px-2 py-1">
+                                        ✕
+                                    </button>
+                                </div>
 
-                    {/* SST */}
-                    <button
-                      onClick={() => setSstVisible(!sstVisible)} 
-                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${sstVisible
-                          ? 'border-[#06b6d4] bg-[#06b6d4]/10 text-[#06b6d4]'
-                          : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
-                        }`}
-                    >
-                      <span>SEA SURFACE TEMP</span>
-                      <span className={`text-xs px-2 py-0.5 rounded ${sstVisible 
-                          ? 'bg-[#06b6d4]/20 text-[#06b6d4]' 
-                          : 'bg-[#1a2744] text-slate-600'}`}>
-                        {sstVisible ? 'ON' : 'OFF'}
-                      </span>
-                    </button>
+                                {/* Layer rows */}
+                                <div className="px-4 py-3 space-y-1">
 
-                    {/* DARK FLEET */}
-                    <button
-                      onClick={() => setDarkFleetVisible(!darkFleetVisible)}
-                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${darkFleetVisible
-                          ? 'border-[#ef4444] bg-[#ef4444]/10 text-[#ef4444]'
-                          : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
-                        }`}
-                    >
-                      <span>DARK FLEET</span>
-                      <span className={`text-xs px-2 py-0.5 rounded ${darkFleetVisible 
-                          ? 'bg-[#ef4444]/20 text-[#ef4444]' 
-                          : 'bg-[#1a2744] text-slate-600'}`}>
-                        {darkFleetVisible ? 'ON' : 'OFF'}
-                      </span>
-                    </button>
+                                    {/* ROUTE */}
+                                    <button
+                                        onClick={() => setIsRouteMode(!isRouteMode)}
+                                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${isRouteMode
+                                            ? 'border-[#00d4ff] bg-[#00d4ff]/10 text-[#00d4ff]'
+                                            : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
+                                            }`}
+                                    >
+                                        <span>ROUTE BUILDER</span>
+                                        <span className={`text-xs px-2 py-0.5 rounded ${isRouteMode
+                                            ? 'bg-[#00d4ff]/20 text-[#00d4ff]'
+                                            : 'bg-[#1a2744] text-slate-600'}`}>
+                                            {isRouteMode ? 'ON' : 'OFF'}
+                                        </span>
+                                    </button>
 
-                    {/* PIRACY */}
-                    <button
-                      onClick={() => setShowPiracy(!showPiracy)}
-                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${showPiracy
-                          ? 'border-[#f97316] bg-[#f97316]/10 text-[#f97316]'
-                          : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
-                        }`}
-                    >
-                      <span>PIRACY ZONES</span>
-                      <span className={`text-xs px-2 py-0.5 rounded ${showPiracy 
-                          ? 'bg-[#f97316]/20 text-[#f97316]' 
-                          : 'bg-[#1a2744] text-slate-600'}`}>
-                        {showPiracy ? 'ON' : 'OFF'}
-                      </span>
-                    </button>
+                                    {/* SST */}
+                                    <button
+                                        onClick={() => setSstVisible(!sstVisible)}
+                                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${sstVisible
+                                            ? 'border-[#06b6d4] bg-[#06b6d4]/10 text-[#06b6d4]'
+                                            : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
+                                            }`}
+                                    >
+                                        <span>SEA SURFACE TEMP</span>
+                                        <span className={`text-xs px-2 py-0.5 rounded ${sstVisible
+                                            ? 'bg-[#06b6d4]/20 text-[#06b6d4]'
+                                            : 'bg-[#1a2744] text-slate-600'}`}>
+                                            {sstVisible ? 'ON' : 'OFF'}
+                                        </span>
+                                    </button>
 
-                    <button
-                      onClick={() => setShowSts(!showSts)}
-                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${showSts
-                          ? 'border-[#8b5cf6] bg-[#8b5cf6]/10 text-[#8b5cf6]'
-                          : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
-                        }`}
-                    >
-                      <span>STS TRANSFERS</span>
-                      <span className={`text-xs px-2 py-0.5 rounded ${showSts 
-                          ? 'bg-[#8b5cf6]/20 text-[#8b5cf6]' 
-                          : 'bg-[#1a2744] text-slate-600'}`}>
-                        {showSts ? 'ON' : 'OFF'}
-                      </span>
-                    </button>
+                                    {/* DARK FLEET */}
+                                    <button
+                                        onClick={() => setDarkFleetVisible(!darkFleetVisible)}
+                                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${darkFleetVisible
+                                            ? 'border-[#ef4444] bg-[#ef4444]/10 text-[#ef4444]'
+                                            : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
+                                            }`}
+                                    >
+                                        <span>DARK FLEET</span>
+                                        <span className={`text-xs px-2 py-0.5 rounded ${darkFleetVisible
+                                            ? 'bg-[#ef4444]/20 text-[#ef4444]'
+                                            : 'bg-[#1a2744] text-slate-600'}`}>
+                                            {darkFleetVisible ? 'ON' : 'OFF'}
+                                        </span>
+                                    </button>
 
-                    {/* DENSITY */}
-                    <button
-                      onClick={() => setShowHeatmap(!showHeatmap)}
-                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${showHeatmap
-                          ? 'border-[#8b5cf6] bg-[#8b5cf6]/10 text-[#8b5cf6]'
-                          : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
-                        }`}
-                    >
-                      <span>VESSEL DENSITY</span>
-                      <span className={`text-xs px-2 py-0.5 rounded ${showHeatmap 
-                          ? 'bg-[#8b5cf6]/20 text-[#8b5cf6]' 
-                          : 'bg-[#1a2744] text-slate-600'}`}>
-                        {showHeatmap ? 'ON' : 'OFF'}
-                      </span>
-                    </button>
+                                    {/* PIRACY */}
+                                    <button
+                                        onClick={() => setShowPiracy(!showPiracy)}
+                                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${showPiracy
+                                            ? 'border-[#f97316] bg-[#f97316]/10 text-[#f97316]'
+                                            : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
+                                            }`}
+                                    >
+                                        <span>PIRACY ZONES</span>
+                                        <span className={`text-xs px-2 py-0.5 rounded ${showPiracy
+                                            ? 'bg-[#f97316]/20 text-[#f97316]'
+                                            : 'bg-[#1a2744] text-slate-600'}`}>
+                                            {showPiracy ? 'ON' : 'OFF'}
+                                        </span>
+                                    </button>
 
-                    {/* WATCH LIST */}
-                    <button
-                      onClick={() => {
-                        setShowWatchList(true)
-                        setLayersOpen(false)
-                        setSelectedVessel(null)
-                      }}
-                      className="w-full flex items-center justify-between px-4 py-3 border border-[#1a2744] bg-[#0d1424] transition-colors touch-manipulation"
-                    >
-                      <span className="font-mono tracking-widest text-xs text-slate-400">WATCH LIST</span>
-                      {watchList.length > 0 ? (
-                        <span className="text-[#00d4ff] font-mono tracking-widest text-xs">
-                           {watchList.length} VESSEL{watchList.length !== 1 ? 'S' : ''}
-                        </span>
-                      ) : (
-                        <span className="text-slate-500 font-mono tracking-widest text-xs">EMPTY</span>
-                      )}
-                    </button>
+                                    <button
+                                        onClick={() => setShowSts(!showSts)}
+                                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${showSts
+                                            ? 'border-[#8b5cf6] bg-[#8b5cf6]/10 text-[#8b5cf6]'
+                                            : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
+                                            }`}
+                                    >
+                                        <span>STS TRANSFERS</span>
+                                        <span className={`text-xs px-2 py-0.5 rounded ${showSts
+                                            ? 'bg-[#8b5cf6]/20 text-[#8b5cf6]'
+                                            : 'bg-[#1a2744] text-slate-600'}`}>
+                                            {showSts ? 'ON' : 'OFF'}
+                                        </span>
+                                    </button>
 
-                  </div>
+                                    {/* DENSITY */}
+                                    <button
+                                        onClick={() => setShowHeatmap(!showHeatmap)}
+                                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors touch-manipulation font-data text-sm tracking-wider ${showHeatmap
+                                            ? 'border-[#8b5cf6] bg-[#8b5cf6]/10 text-[#8b5cf6]'
+                                            : 'border-[#1a2744] bg-[#0d1424] text-slate-400'
+                                            }`}
+                                    >
+                                        <span>VESSEL DENSITY</span>
+                                        <span className={`text-xs px-2 py-0.5 rounded ${showHeatmap
+                                            ? 'bg-[#8b5cf6]/20 text-[#8b5cf6]'
+                                            : 'bg-[#1a2744] text-slate-600'}`}>
+                                            {showHeatmap ? 'ON' : 'OFF'}
+                                        </span>
+                                    </button>
 
-                  {/* Active count footer */}
-                  <div className="px-5 py-3 border-t border-[#1a2744]">
-                    <span className="text-slate-600 text-[10px] font-data tracking-widest">
-                      {[isRouteMode, sstVisible, darkFleetVisible, showPiracy, showSts, showHeatmap].filter(Boolean).length} LAYER(S) ACTIVE
-                    </span>
-                  </div>
+                                    {/* WATCH LIST */}
+                                    <button
+                                        onClick={() => {
+                                            setShowWatchList(true)
+                                            setLayersOpen(false)
+                                            setSelectedVessel(null)
+                                        }}
+                                        className="w-full flex items-center justify-between px-4 py-3 border border-[#1a2744] bg-[#0d1424] transition-colors touch-manipulation"
+                                    >
+                                        <span className="font-mono tracking-widest text-xs text-slate-400">WATCH LIST</span>
+                                        {watchList.length > 0 ? (
+                                            <span className="text-[#00d4ff] font-mono tracking-widest text-xs">
+                                                {watchList.length} VESSEL{watchList.length !== 1 ? 'S' : ''}
+                                            </span>
+                                        ) : (
+                                            <span className="text-slate-500 font-mono tracking-widest text-xs">EMPTY</span>
+                                        )}
+                                    </button>
 
-                </div>
-              </>
-            )}
-            </>
+                                </div>
+
+                                {/* Active count footer */}
+                                <div className="px-5 py-3 border-t border-[#1a2744]">
+                                    <span className="text-slate-600 text-[10px] font-data tracking-widest">
+                                        {[isRouteMode, sstVisible, darkFleetVisible, showPiracy, showSts, showHeatmap].filter(Boolean).length} LAYER(S) ACTIVE
+                                    </span>
+                                </div>
+
+                            </div>
+                        </>
+                    )}
+                </>
             )}
 
             {/* ── Vessel type legend ─────────────────────────────────────────────── */}
             {!embedMode && (
-            <div className="absolute bottom-6 left-4 glass-panel rounded z-10 p-2 sm:p-3 max-w-[140px] sm:max-w-none">
-                <div className="text-text-muted text-[10px] sm:text-xs font-data mb-1 sm:mb-2 uppercase tracking-widest">
-                    Vessel Types
+                <div className="absolute bottom-6 left-4 glass-panel rounded z-10 p-2 sm:p-3 max-w-[140px] sm:max-w-none">
+                    <div className="text-text-muted text-[10px] sm:text-xs font-data mb-1 sm:mb-2 uppercase tracking-widest">
+                        Vessel Types
+                    </div>
+                    {[
+                        { label: 'Cargo', color: '#3498DB' },
+                        { label: 'Tanker', color: '#E74C3C' },
+                        { label: 'Passenger', color: '#9B59B6' },
+                        { label: 'Fishing', color: '#27AE60' },
+                        { label: 'High Speed', color: '#F39C12' },
+                        { label: 'Unknown', color: '#7F8C8D' },
+                    ].map(({ label, color }) => (
+                        <div key={label} className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+                            <div
+                                className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: color, boxShadow: `0 0 4px ${color}` }}
+                            />
+                            <span className="text-text-secondary text-[10px] sm:text-xs font-body">{label}</span>
+                        </div>
+                    ))}
+                    {/* Alert indicators */}
+                    <div className="border-t border-glow mt-1.5 sm:mt-2 pt-1.5 sm:pt-2">
+                        <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+                            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-alert-critical" style={{ boxShadow: '0 0 4px #FF4444' }} />
+                            <span className="text-alert-critical text-[10px] sm:text-xs font-body">Sanctions Match</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-alert-warning" style={{ boxShadow: '0 0 4px #FFB800' }} />
+                            <span className="text-alert-warning text-[10px] sm:text-xs font-body">Anomaly Detected</span>
+                        </div>
+                    </div>
                 </div>
-                {[
-                    { label: 'Cargo', color: '#3498DB' },
-                    { label: 'Tanker', color: '#E74C3C' },
-                    { label: 'Passenger', color: '#9B59B6' },
-                    { label: 'Fishing', color: '#27AE60' },
-                    { label: 'High Speed', color: '#F39C12' },
-                    { label: 'Unknown', color: '#7F8C8D' },
-                ].map(({ label, color }) => (
-                    <div key={label} className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
-                        <div
-                            className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: color, boxShadow: `0 0 4px ${color}` }}
-                        />
-                        <span className="text-text-secondary text-[10px] sm:text-xs font-body">{label}</span>
-                    </div>
-                ))}
-                {/* Alert indicators */}
-                <div className="border-t border-glow mt-1.5 sm:mt-2 pt-1.5 sm:pt-2">
-                    <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
-                        <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-alert-critical" style={{ boxShadow: '0 0 4px #FF4444' }} />
-                        <span className="text-alert-critical text-[10px] sm:text-xs font-body">Sanctions Match</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                        <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-alert-warning" style={{ boxShadow: '0 0 4px #FFB800' }} />
-                        <span className="text-alert-warning text-[10px] sm:text-xs font-body">Anomaly Detected</span>
-                    </div>
-                </div>
-            </div>
             )}
 
             {/* ── Hover tooltip ──────────────────────────────────────────────────── */}
@@ -1059,84 +1055,84 @@ export default function GlobeViewComponent({
             {/* ── RIGHT SIDE PANELS (one at a time) ─────────── */}
 
             {!embedMode && (
-            <>
-            {/* Piracy incident detail */}
-            {selectedPiracy && (
-                <PiracyPanel
-                    incident={selectedPiracy}
-                    onClose={() => setSelectedPiracy(null)}
-                />
-            )}
+                <>
+                    {/* Piracy incident detail */}
+                    {selectedPiracy && (
+                        <PiracyPanel
+                            incident={selectedPiracy}
+                            onClose={() => setSelectedPiracy(null)}
+                        />
+                    )}
 
-            {/* Vessel detail — RIGHT side */}
-            {selectedVessel && (
-                <VesselPanel
-                    vessel={selectedVessel}
-                    onClose={() => { setSelectedVessel(null); setSpillResult(null) }}
-                />
-            )}
+                    {/* Vessel detail — RIGHT side */}
+                    {selectedVessel && (
+                        <VesselPanel
+                            vessel={selectedVessel}
+                            onClose={() => { setSelectedVessel(null); setSpillResult(null) }}
+                        />
+                    )}
 
-            {/* Watch List panel */}
-            {showWatchList && (
-                <WatchListPanel
-                    onClose={() => setShowWatchList(false)}
-                    onSelectVessel={(mmsi: string) => {
-                        const vessel = globeData.vessels.find((v: any) => v.mmsi === mmsi)
-                        if (vessel) {
-                            setSelectedPort(null)
-                            setSelectedPiracy(null)
-                            setSpillResult(null)
-                            setSelectedVessel(vessel)
-                            setShowWatchList(false)
-                        }
-                    }}
-                />
-            )}
+                    {/* Watch List panel */}
+                    {showWatchList && (
+                        <WatchListPanel
+                            onClose={() => setShowWatchList(false)}
+                            onSelectVessel={(mmsi: string) => {
+                                const vessel = globeData.vessels.find((v: any) => v.mmsi === mmsi)
+                                if (vessel) {
+                                    setSelectedPort(null)
+                                    setSelectedPiracy(null)
+                                    setSpillResult(null)
+                                    setSelectedVessel(vessel)
+                                    setShowWatchList(false)
+                                }
+                            }}
+                        />
+                    )}
 
-            {/* Port detail — RIGHT side */}
-            {selectedPort && (
-                <PortPanel
-                    port={selectedPort}
-                    onClose={() => setSelectedPort(null)}
-                />
-            )}
+                    {/* Port detail — RIGHT side */}
+                    {selectedPort && (
+                        <PortPanel
+                            port={selectedPort}
+                            onClose={() => setSelectedPort(null)}
+                        />
+                    )}
 
-            {/* Route risk panel — RIGHT side, only when no vessel/port */}
-            {!selectedVessel && !selectedPort && (
-                <RouteRiskPanel
-                    waypoints={waypoints}
-                    threats={threats}
-                    isAnalyzing={isAnalyzing}
-                    onClear={clearRoute}
-                />
-            )}
+                    {/* Route risk panel — RIGHT side, only when no vessel/port */}
+                    {!selectedVessel && !selectedPort && (
+                        <RouteRiskPanel
+                            waypoints={waypoints}
+                            threats={threats}
+                            isAnalyzing={isAnalyzing}
+                            onClear={clearRoute}
+                        />
+                    )}
 
-            {/* ── LEFT SIDE PANELS ────────────────────────────── */}
+                    {/* ── LEFT SIDE PANELS ────────────────────────────── */}
 
-            {/* Spill prediction — LEFT side, independent of vessel panel */}
-            {selectedVessel && (
-                <div className="absolute left-3 sm:left-4 top-16 w-[calc(100vw-24px)] sm:w-96 max-w-[calc(50vw-32px)] pointer-events-auto z-10">
-                    <SpillPanel
-                        vesselLat={selectedVessel.lat}
-                        vesselLon={selectedVessel.lon}
-                        mmsi={selectedVessel.mmsi}
-                        vesselType={selectedVessel.type_category ?? null}
-                        onSpillResult={setSpillResult}
-                    />
-                </div>
-            )}
+                    {/* Spill prediction — LEFT side, independent of vessel panel */}
+                    {selectedVessel && (
+                        <div className="absolute left-3 sm:left-4 top-16 w-[calc(100vw-24px)] sm:w-96 max-w-[calc(50vw-32px)] pointer-events-auto z-10">
+                            <SpillPanel
+                                vesselLat={selectedVessel.lat}
+                                vesselLon={selectedVessel.lon}
+                                mmsi={selectedVessel.mmsi}
+                                vesselType={selectedVessel.type_category ?? null}
+                                onSpillResult={setSpillResult}
+                            />
+                        </div>
+                    )}
 
-            {showCompare && selectedVessel && comparedVessel && (
-                <ComparePanel
-                    vesselA={{ ...selectedVessel, mmsi: Number(selectedVessel.mmsi) } as any}
-                    vesselB={{ ...comparedVessel, mmsi: Number(comparedVessel.mmsi) } as any}
-                    onClose={() => {
-                        setShowCompare(false)
-                        setComparedVessel(null)
-                    }}
-                />
-            )}
-            </>
+                    {showCompare && selectedVessel && comparedVessel && (
+                        <ComparePanel
+                            vesselA={{ ...selectedVessel, mmsi: Number(selectedVessel.mmsi) } as any}
+                            vesselB={{ ...comparedVessel, mmsi: Number(comparedVessel.mmsi) } as any}
+                            onClose={() => {
+                                setShowCompare(false)
+                                setComparedVessel(null)
+                            }}
+                        />
+                    )}
+                </>
             )}
         </div>
     );

@@ -56,24 +56,24 @@ export default function PortPanel({ port, onClose }: Props) {
     const [brief, setBrief] = useState<string | null>(null);
     const [briefLoading, setBriefLoading] = useState(false);
     const [briefError, setBriefError] = useState<string | null>(null);
-    const portLocode = (port as any).un_locode ?? null;
+    const portLocode = port.un_locode ?? null;
     const { forecast, isLoading: forecastLoading } = usePortForecast(portLocode);
-    const currentCI = (port as any).congestion_index ?? 0
-    const inbound = (port as any).inbound_vessel_count ?? 0
-    const active = (port as any).active_vessel_count ?? 0
+    const currentCI = port.congestion_index ?? 0
+    const inbound = port.inbound_vessel_count ?? 0
+    const active = port.active_vessel_count ?? 0
 
     // Inbound ratio: if many vessels approaching vs active, 
     // congestion will rise. If few, it will decay.
     const inboundPressure = active > 0 ? inbound / active : 0
-    const trend = inboundPressure > 0.3 ? 1.15 : 
-                  inboundPressure > 0.1 ? 1.05 : 0.88
+    const trend = inboundPressure > 0.3 ? 1.15 :
+        inboundPressure > 0.1 ? 1.05 : 0.88
 
     const ci24 = Math.min(100, Math.round(currentCI * trend))
     const ci48 = Math.min(100, Math.round(ci24 * (trend > 1 ? trend * 0.95 : trend)))
     const ci72 = Math.min(100, Math.round(ci48 * 0.92))
 
     const instantForecast = [
-        { hour_offset: 0,  vessel_count: active,  congestion_index: currentCI },
+        { hour_offset: 0, vessel_count: active, congestion_index: currentCI },
         { hour_offset: 24, vessel_count: 0, congestion_index: ci24 },
         { hour_offset: 48, vessel_count: 0, congestion_index: ci48 },
         { hour_offset: 72, vessel_count: 0, congestion_index: ci72 },

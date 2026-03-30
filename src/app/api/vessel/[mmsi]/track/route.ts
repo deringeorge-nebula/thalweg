@@ -36,8 +36,8 @@ export async function GET(
       { mmsi, track: data ?? [], count: data?.length ?? 0 },
       { headers: { 'Cache-Control': 'public, s-maxage=60' } }
     );
-  } catch (err: any) {
-    console.error('[vessel track API] Unexpected error:', err.message);
+  } catch (err: unknown) {
+    console.error('[vessel track API] Unexpected error:', err instanceof Error ? err.message : String(err));
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

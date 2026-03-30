@@ -30,7 +30,7 @@ export function useWatchList(): UseWatchListReturn {
       if (stored) {
         setWatchList(JSON.parse(stored))
       }
-    } catch (e) {
+    } catch {
       // Ignore
     }
   }, [])
@@ -41,7 +41,7 @@ export function useWatchList(): UseWatchListReturn {
       const updated = [...prev, vessel]
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-      } catch (e) {
+      } catch {
         // Ignore
       }
       return updated
@@ -53,7 +53,7 @@ export function useWatchList(): UseWatchListReturn {
       const updated = prev.filter(v => v.mmsi !== mmsi)
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-      } catch (e) {
+      } catch {
         // Ignore
       }
       return updated
@@ -68,7 +68,7 @@ export function useWatchList(): UseWatchListReturn {
     setWatchList([])
     try {
       localStorage.removeItem(STORAGE_KEY)
-    } catch (e) {
+    } catch {
       // Ignore
     }
   }

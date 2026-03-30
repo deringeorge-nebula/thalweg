@@ -35,14 +35,14 @@ export function usePortForecast(locode: string | null): {
           throw new Error(errorData?.error || `HTTP error ${res.status}`)
         }
         const data = await res.json()
-        
+
         if (isMounted) {
           setForecast(data.forecast || [])
           setIsLoading(false)
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (isMounted) {
-          setError(err.message || 'Failed to fetch forecast')
+          setError(err instanceof Error ? err.message : 'Failed to fetch forecast')
           setIsLoading(false)
         }
       }

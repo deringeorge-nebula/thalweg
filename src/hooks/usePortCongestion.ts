@@ -1,9 +1,7 @@
 // src/hooks/usePortCongestion.ts
-// Fetches port congestion data every 5 minutes — matches the Edge Function schedule.
-
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 export interface PortWithCongestion {
@@ -24,13 +22,46 @@ export interface PortWithCongestion {
     calculated_at: string | null;
 }
 
+// Fix 1: type for the Supabase join row — replaces `any` on line 56
+interface PortQueryRow {
+    id: string;
+    name: string;
+    country: string;
+    lat: number;
+    lon: number;
+    un_locode: string | null;
+    port_congestion: {
+        congestion_index: number;
+        congestion_status: string;
+        active_vessel_count: number;
+        inbound_vessel_count: number;
+        weighted_vessel_count: number;
+        predicted_congestion_24h: number;
+        predicted_congestion_48h: number;
+        predicted_congestion_72h: number;
+        calculated_at: string | null;
+    } | {
+        congestion_index: number;
+        congestion_status: string;
+        active_vessel_count: number;
+        inbound_vessel_count: number;
+        weighted_vessel_count: number;
+        predicted_congestion_24h: number;
+        predicted_congestion_48h: number;
+        predicted_congestion_72h: number;
+        calculated_at: string | null;
+    }[] | null;
+}
+
 export function usePortCongestion() {
-    const supabase = createClient();
+    // Fix 2: stable supabase ref — createClient() called once, not on every render
+    const supabaseRef = useRef(createClient());
     const [ports, setPorts] = useState<PortWithCongestion[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    async function fetchPorts() {
-        const { data, error } = await supabase
+    // Fix 3: useCallback makes fetchPorts stable — safe to add to useEffect deps
+    const fetchPorts = useCallback(async () => {
+        const { data, error } = await supabaseRef.current
             .from('ports')
             .select(`
         id, name, country, lat, lon, un_locode,
@@ -53,7 +84,7 @@ export function usePortCongestion() {
             return;
         }
 
-        const merged: PortWithCongestion[] = data.map((p: any) => {
+        const merged: PortWithCongestion[] = (data as unknown as PortQueryRow[]).map((p) => {
             const congestion = Array.isArray(p.port_congestion)
                 ? p.port_congestion[0]
                 : p.port_congestion;
@@ -78,14 +109,14 @@ export function usePortCongestion() {
 
         setPorts(merged);
         setIsLoading(false);
-    }
+    }, []); // no deps — supabaseRef.current is stable via useRef
 
+    // Fix 4: fetchPorts is now stable, safe to include in deps
     useEffect(() => {
         fetchPorts();
-        // Re-fetch every 5 minutes — matches cron schedule
         const interval = setInterval(fetchPorts, 5 * 60 * 1000);
         return () => clearInterval(interval);
-    }, []);
+    }, [fetchPorts]);
 
     return { ports, isLoading };
 }

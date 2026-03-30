@@ -59,11 +59,7 @@ export function ComparePanel({ vesselA, vesselB, onClose }: ComparePanelProps) {
     return isAnomaly ? 'text-[#f97316]' : 'text-slate-200';
   }
 
-  function sanctionsColor(match?: boolean): string {
-    return match ? 'text-[#ef4444]' : 'text-slate-200';
-  }
-
-  function flagColor(vessel: VesselData): string {
+  function flagColor(): string {
     return flagsDiffer ? 'text-[#eab308]' : 'text-slate-200';
   }
 
@@ -108,7 +104,7 @@ export function ComparePanel({ vesselA, vesselB, onClose }: ComparePanelProps) {
       {
         label: 'Flag State',
         value: vessel.flag_state ?? '—',
-        className: flagColor(vessel),
+        className: flagColor(),
       },
       {
         label: 'Type',
