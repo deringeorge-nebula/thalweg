@@ -6,6 +6,10 @@ export const config = {
 }
 
 export async function middleware(request: NextRequest) {
+  // Skip middleware entirely for long-running cron routes
+  if (request.nextUrl.pathname === '/api/intelligence-briefs/generate') {
+    return NextResponse.next()
+  }
   const forwarded = request.headers.get('x-forwarded-for')
   const ip = forwarded ? forwarded.split(',')[0].trim() : 'unknown'
 

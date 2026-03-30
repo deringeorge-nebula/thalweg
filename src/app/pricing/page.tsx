@@ -9,8 +9,7 @@ export const metadata = {
   description: 'Maritime intelligence for every operator. Free for researchers and open-source users. Pro and Enterprise tiers for commercial operations.',
 }
 
-// Revalidate every 5 minutes — matches congestion cron
-export const revalidate = 300
+export const dynamic = 'force-dynamic'
 
 interface PlatformStats {
   vesselCount: number
@@ -22,28 +21,44 @@ interface PlatformStats {
 }
 
 async function getPlatformStats(): Promise<PlatformStats> {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.MY_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  )
+  const fallback: PlatformStats = {
+    vesselCount: 0, darkFleetCount: 0, sanctionsCount: 0,
+    piracyCount: 0, anomalyCount: 0, portCount: 0,
+  }
 
-  const [vessels, darkFleet, sanctions, piracy, anomalies, ports] = await Promise.allSettled([
-    supabase.from('vessels').select('*', { count: 'exact', head: true }),
-    supabase.from('vessels').select('*', { count: 'exact', head: true }).gte('dark_fleet_score', 60),
-    supabase.from('vessels').select('*', { count: 'exact', head: true }).eq('sanctions_match', true),
-    supabase.from('piracy_incidents').select('*', { count: 'exact', head: true }),
-    supabase.from('anomalies').select('*', { count: 'exact', head: true }).eq('resolved', false),
-    supabase.from('port_congestion').select('*', { count: 'exact', head: true }),
-  ])
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.MY_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
+    )
 
-  return {
-    vesselCount: vessels.status === 'fulfilled' ? (vessels.value.count ?? 0) : 0,
-    darkFleetCount: darkFleet.status === 'fulfilled' ? (darkFleet.value.count ?? 0) : 0,
-    sanctionsCount: sanctions.status === 'fulfilled' ? (sanctions.value.count ?? 0) : 0,
-    piracyCount: piracy.status === 'fulfilled' ? (piracy.value.count ?? 0) : 0,
-    anomalyCount: anomalies.status === 'fulfilled' ? (anomalies.value.count ?? 0) : 0,
-    portCount: ports.status === 'fulfilled' ? (ports.value.count ?? 0) : 0,
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('stats timeout')), 5000)
+    )
+
+    const fetching = Promise.allSettled([
+      supabase.from('vessels').select('*', { count: 'exact', head: true }),
+      supabase.from('vessels').select('*', { count: 'exact', head: true }).gte('dark_fleet_score', 60),
+      supabase.from('vessels').select('*', { count: 'exact', head: true }).eq('sanctions_match', true),
+      supabase.from('piracy_incidents').select('*', { count: 'exact', head: true }),
+      supabase.from('anomalies').select('*', { count: 'exact', head: true }).eq('resolved', false),
+      supabase.from('port_congestion').select('*', { count: 'exact', head: true }),
+    ])
+
+    const [vessels, darkFleet, sanctions, piracy, anomalies, ports] =
+      await Promise.race([fetching, timeout])
+
+    return {
+      vesselCount: vessels.status === 'fulfilled' ? (vessels.value.count ?? 0) : 0,
+      darkFleetCount: darkFleet.status === 'fulfilled' ? (darkFleet.value.count ?? 0) : 0,
+      sanctionsCount: sanctions.status === 'fulfilled' ? (sanctions.value.count ?? 0) : 0,
+      piracyCount: piracy.status === 'fulfilled' ? (piracy.value.count ?? 0) : 0,
+      anomalyCount: anomalies.status === 'fulfilled' ? (anomalies.value.count ?? 0) : 0,
+      portCount: ports.status === 'fulfilled' ? (ports.value.count ?? 0) : 0,
+    }
+  } catch {
+    return fallback
   }
 }
 
@@ -53,7 +68,7 @@ export default async function PricingPage() {
   return (
     <div className="bg-[#0a0f1e] min-h-screen px-4 sm:px-8 py-12 sm:py-16">
 
-      {/* ── Hero ────────────────────────────────────────────────────────────── */}
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <div className="text-center mb-10 sm:mb-12">
         <div className="font-mono tracking-widest text-[#00d4ff] text-[10px] mb-4">
           THALWEG INTELLIGENCE PLATFORM
@@ -66,48 +81,24 @@ export default async function PricingPage() {
         </p>
       </div>
 
-      {/* ── Live Platform Stats Bar ─────────────────────────────────────────── */}
+      {/* ── Live Platform Stats Bar ───────────────────────────────────────── */}
       <div className="max-w-5xl mx-auto mb-12 sm:mb-16 border border-[#1a2744] bg-[#0d1424] rounded-none p-5 sm:p-6">
         <div className="flex items-center gap-2 mb-5">
           <div className="w-1.5 h-1.5 rounded-full bg-[#00ff88] animate-pulse" style={{ boxShadow: '0 0 6px #00ff88' }} />
           <span className="font-mono tracking-widest text-[10px] text-slate-400">LIVE PLATFORM DATA</span>
-          <span className="font-mono tracking-widest text-[10px] text-slate-600 ml-auto">refreshes every 5 min</span>
+          <span className="font-mono tracking-widest text-[10px] text-slate-600 ml-auto">updates on every visit</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-6">
-          <StatBlock
-            value={stats.vesselCount.toLocaleString()}
-            label="VESSELS TRACKED"
-            color="text-[#00d4ff]"
-          />
-          <StatBlock
-            value={stats.darkFleetCount.toLocaleString()}
-            label="DARK FLEET ≥60"
-            color="text-[#ef4444]"
-          />
-          <StatBlock
-            value={stats.sanctionsCount.toLocaleString()}
-            label="SANCTIONS MATCHES"
-            color="text-[#f97316]"
-          />
-          <StatBlock
-            value={stats.piracyCount.toLocaleString()}
-            label="PIRACY INCIDENTS"
-            color="text-[#eab308]"
-          />
-          <StatBlock
-            value={stats.anomalyCount.toLocaleString()}
-            label="ACTIVE ANOMALIES"
-            color="text-[#a78bfa]"
-          />
-          <StatBlock
-            value={stats.portCount.toLocaleString()}
-            label="PORTS MONITORED"
-            color="text-[#00ff88]"
-          />
+          <StatBlock value={stats.vesselCount.toLocaleString()} label="VESSELS TRACKED" color="text-[#00d4ff]" />
+          <StatBlock value={stats.darkFleetCount.toLocaleString()} label="DARK FLEET ≥60" color="text-[#ef4444]" />
+          <StatBlock value={stats.sanctionsCount.toLocaleString()} label="SANCTIONS MATCHES" color="text-[#f97316]" />
+          <StatBlock value={stats.piracyCount.toLocaleString()} label="PIRACY INCIDENTS" color="text-[#eab308]" />
+          <StatBlock value={stats.anomalyCount.toLocaleString()} label="ACTIVE ANOMALIES" color="text-[#a78bfa]" />
+          <StatBlock value={stats.portCount.toLocaleString()} label="PORTS MONITORED" color="text-[#00ff88]" />
         </div>
       </div>
 
-      {/* ── Pricing tiers ───────────────────────────────────────────────────── */}
+      {/* ── Pricing tiers ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto">
 
         {/* TIER 1 — FREE */}
@@ -123,7 +114,7 @@ export default async function PricingPage() {
             </div>
           </div>
           <div className="flex-1 space-y-2.5 mb-8">
-            <FeatureRow check text={`Live vessel tracking — ${stats.vesselCount > 0 ? stats.vesselCount.toLocaleString() : '50,000+'}  vessels`} accentClass="text-slate-300" />
+            <FeatureRow check text={`Live vessel tracking — ${stats.vesselCount > 0 ? stats.vesselCount.toLocaleString() : '50,000+'} vessels`} accentClass="text-slate-300" />
             <FeatureRow check text={`Port congestion indices — ${stats.portCount > 0 ? stats.portCount : 50} major ports`} accentClass="text-slate-300" />
             <FeatureRow check text="Piracy incident layer (IMB data)" accentClass="text-slate-300" />
             <FeatureRow check text="Dark fleet detection layer" accentClass="text-slate-300" />
@@ -149,7 +140,7 @@ export default async function PricingPage() {
 
         {/* TIER 2 — PRO */}
         <div className="relative flex flex-col h-full bg-[#0d1424] border border-[#00d4ff] p-6 sm:p-8 mt-4 sm:mt-0 pt-8 sm:pt-10 rounded-none">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#00d4ff] text-[#0a0f1e] font-mono tracking-widest text-[10px] px-3 py-1 mb-0 whitespace-nowrap rounded-none inline-block">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#00d4ff] text-[#0a0f1e] font-mono tracking-widest text-[10px] px-3 py-1 whitespace-nowrap rounded-none inline-block">
             MOST POPULAR
           </div>
           <div className="pb-6 border-b border-[#1a2744] mb-6">
@@ -211,7 +202,7 @@ export default async function PricingPage() {
 
       </div>
 
-      {/* ── Footer section ───────────────────────────────────────────────────── */}
+      {/* ── Footer section ────────────────────────────────────────────────── */}
       <div className="border-t border-[#1a2744] pt-8 mt-16 max-w-5xl mx-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
           <div>
@@ -259,8 +250,6 @@ export default async function PricingPage() {
     </div>
   )
 }
-
-// ── Sub-components ─────────────────────────────────────────────────────────────
 
 function StatBlock({ value, label, color }: { value: string; label: string; color: string }) {
   return (

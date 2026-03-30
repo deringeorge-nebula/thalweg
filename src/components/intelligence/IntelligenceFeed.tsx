@@ -98,7 +98,7 @@ export default function IntelligenceFeed() {
         fetch('/api/sts', { cache: 'no-store' }),
       ])
 
-      const anomalyEvents: RiskEvent[] = 
+      const anomalyEvents: RiskEvent[] =
         anomaliesRes.status === 'fulfilled' && anomaliesRes.value.ok
           ? await anomaliesRes.value.json()
           : []
@@ -128,9 +128,9 @@ export default function IntelligenceFeed() {
 
       setEvents(merged)
 
-      const briefsRes = await fetch('/api/risk-zones', { cache: 'no-store' })
-      const briefsData: IntelBrief[] = briefsRes.ok 
-        ? await briefsRes.json() 
+      const briefsRes = await fetch('/api/intelligence-briefs', { cache: 'no-store' })
+      const briefsData: IntelBrief[] = briefsRes.ok
+        ? await briefsRes.json()
         : []
       setBriefs(briefsData)
 
@@ -162,8 +162,8 @@ export default function IntelligenceFeed() {
     };
   }, [fetchFeeds]);
 
-  const filteredEvents = activeRegion === 'GLOBAL' 
-    ? events 
+  const filteredEvents = activeRegion === 'GLOBAL'
+    ? events
     : events.filter((e) => e.region.includes(activeRegion));
 
   const filteredBriefs = activeRegion === 'GLOBAL'
@@ -175,14 +175,13 @@ export default function IntelligenceFeed() {
       <div className="overflow-x-auto no-scrollbar mb-6 border-b border-[#1a2744] pb-2">
         <div className="flex space-x-2 w-max">
           {REGIONS.map((region) => (
-            <button 
-              key={region} 
+            <button
+              key={region}
               onClick={() => setActiveRegion(region)}
-              className={`touch-manipulation rounded-none px-4 py-2 font-mono tracking-widest text-xs transition-colors ${
-                activeRegion === region 
-                  ? 'bg-[#00d4ff] text-[#0a0f1e]' 
+              className={`touch-manipulation rounded-none px-4 py-2 font-mono tracking-widest text-xs transition-colors ${activeRegion === region
+                  ? 'bg-[#00d4ff] text-[#0a0f1e]'
                   : 'border border-[#1a2744] text-slate-400 hover:border-[#00d4ff] hover:text-[#00d4ff]'
-              }`}
+                }`}
             >
               {region}
             </button>
@@ -195,100 +194,100 @@ export default function IntelligenceFeed() {
           <div className="flex justify-between items-center border-b border-[#1a2744] pb-2">
             <span className="font-mono tracking-widest text-xs text-slate-400">ACTIVE RISK FEED</span>
             <div className="flex items-center space-x-2">
-               {isError && <span className="text-[#f97316] font-mono tracking-widest text-[10px]">⚠ FEED INTERRUPTED</span>}
-               <span className="font-mono tracking-widest text-xs text-slate-400">REFRESH IN {countdown}s</span>
+              {isError && <span className="text-[#f97316] font-mono tracking-widest text-[10px]">⚠ FEED INTERRUPTED</span>}
+              <span className="font-mono tracking-widest text-xs text-slate-400">REFRESH IN {countdown}s</span>
             </div>
           </div>
 
           <div className="flex flex-col space-y-3">
             {loading ? (
-               <>
-                 <div className="animate-pulse bg-[#0d1424] border border-[#1a2744] h-20 w-full" />
-                 <div className="animate-pulse bg-[#0d1424] border border-[#1a2744] h-24 w-full" />
-                 <div className="animate-pulse bg-[#0d1424] border border-[#1a2744] h-20 w-full" />
-               </>
+              <>
+                <div className="animate-pulse bg-[#0d1424] border border-[#1a2744] h-20 w-full" />
+                <div className="animate-pulse bg-[#0d1424] border border-[#1a2744] h-24 w-full" />
+                <div className="animate-pulse bg-[#0d1424] border border-[#1a2744] h-20 w-full" />
+              </>
             ) : filteredEvents.length === 0 ? (
-               <div className="text-center py-8 text-slate-500 font-mono tracking-widest text-xs">
-                 NO ACTIVE ALERTS FOR THIS REGION
-               </div>
+              <div className="text-center py-8 text-slate-500 font-mono tracking-widest text-xs">
+                NO ACTIVE ALERTS FOR THIS REGION
+              </div>
             ) : (
-               filteredEvents.map(event => (
-                 <div key={event.id} className="bg-[#0d1424] border border-[#1a2744] hover:border-[#00d4ff] transition-colors cursor-default p-4 rounded-none">
-                   <div className="flex items-center space-x-2 mb-2">
-                     <span className={`font-mono tracking-widest text-[10px] px-2 py-0.5 ${getSeverityPill(event.severity)}`}>
-                       {event.severity}
-                     </span>
-                     <span className={`border border-current font-mono tracking-widest text-[10px] px-2 py-0.5 ${getCategoryClasses(event.category)}`}>
-                       {event.category}
-                     </span>
-                   </div>
-                   <div className="text-white font-mono text-sm uppercase">
-                     {event.title}
-                   </div>
-                   <div className="text-slate-300 text-xs mt-1">
-                     {event.detail}
-                   </div>
-                   <div className="text-slate-500 text-xs mt-1 font-mono tracking-widest uppercase">
-                     {event.region} · {mounted ? new Date(event.timestamp).toLocaleString() : '...'}
-                   </div>
-                   {event.mmsi && (
-                     <div className="text-[#00d4ff] text-xs mt-1 font-mono tracking-widest uppercase">
-                       MMSI: {event.mmsi}
-                     </div>
-                   )}
-                 </div>
-               ))
+              filteredEvents.map(event => (
+                <div key={event.id} className="bg-[#0d1424] border border-[#1a2744] hover:border-[#00d4ff] transition-colors cursor-default p-4 rounded-none">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <span className={`font-mono tracking-widest text-[10px] px-2 py-0.5 ${getSeverityPill(event.severity)}`}>
+                      {event.severity}
+                    </span>
+                    <span className={`border border-current font-mono tracking-widest text-[10px] px-2 py-0.5 ${getCategoryClasses(event.category)}`}>
+                      {event.category}
+                    </span>
+                  </div>
+                  <div className="text-white font-mono text-sm uppercase">
+                    {event.title}
+                  </div>
+                  <div className="text-slate-300 text-xs mt-1">
+                    {event.detail}
+                  </div>
+                  <div className="text-slate-500 text-xs mt-1 font-mono tracking-widest uppercase">
+                    {event.region} · {mounted ? new Date(event.timestamp).toLocaleString() : '...'}
+                  </div>
+                  {event.mmsi && (
+                    <div className="text-[#00d4ff] text-xs mt-1 font-mono tracking-widest uppercase">
+                      MMSI: {event.mmsi}
+                    </div>
+                  )}
+                </div>
+              ))
             )}
           </div>
         </div>
 
         <div className="flex flex-col space-y-4 mt-6 sm:mt-0">
           <div className="border-b border-[#1a2744] pb-2">
-             <span className="font-mono tracking-widest text-xs text-slate-400">INTELLIGENCE BRIEFS</span>
+            <span className="font-mono tracking-widest text-xs text-slate-400">INTELLIGENCE BRIEFS</span>
           </div>
 
           <div className="flex flex-col space-y-3">
-             {filteredBriefs.length === 0 ? (
-               <div className="text-center py-8 text-slate-500 font-mono tracking-widest text-xs">
-                 NO BRIEFS FOR THIS REGION
-               </div>
-             ) : (
-                filteredBriefs.map(brief => (
-                  <div key={brief.id} className="bg-[#0d1424] border border-[#1a2744] hover:border-[#00d4ff]/50 transition-colors cursor-default p-4 rounded-none">
-                     <div className="flex items-center space-x-2">
-                       <span className={`border border-current font-mono tracking-widest text-[10px] px-2 py-0.5 ${getCategoryClasses(brief.category)}`}>
-                         {brief.category}
-                       </span>
-                       <span className={`font-mono tracking-widest text-[10px] px-2 py-0.5 ${getSeverityPill(brief.severity)}`}>
-                         {brief.severity}
-                       </span>
-                     </div>
-                     <div className="text-white font-mono text-sm leading-snug mt-2">
-                       {brief.title}
-                     </div>
-                     <div className="text-slate-300 text-xs leading-relaxed mt-2">
-                       {brief.summary}
-                     </div>
-                     
-                     <div className="border-t border-[#1a2744] mt-3 pt-2">
-                       <div className="text-slate-500 text-[10px] font-mono tracking-widest uppercase">
-                         CLASSIFICATION: UNCLASSIFIED // OPEN SOURCE
-                       </div>
-                       <div className="text-slate-500 text-[10px] font-mono mt-1 uppercase">
-                         Published: {mounted ? getRelativeTime(brief.published_at) : '...'} · {brief.region}
-                       </div>
-                     </div>
+            {filteredBriefs.length === 0 ? (
+              <div className="text-center py-8 text-slate-500 font-mono tracking-widest text-xs">
+                NO BRIEFS FOR THIS REGION
+              </div>
+            ) : (
+              filteredBriefs.map(brief => (
+                <div key={brief.id} className="bg-[#0d1424] border border-[#1a2744] hover:border-[#00d4ff]/50 transition-colors cursor-default p-4 rounded-none">
+                  <div className="flex items-center space-x-2">
+                    <span className={`border border-current font-mono tracking-widest text-[10px] px-2 py-0.5 ${getCategoryClasses(brief.category)}`}>
+                      {brief.category}
+                    </span>
+                    <span className={`font-mono tracking-widest text-[10px] px-2 py-0.5 ${getSeverityPill(brief.severity)}`}>
+                      {brief.severity}
+                    </span>
                   </div>
-                ))
-             )}
+                  <div className="text-white font-mono text-sm leading-snug mt-2">
+                    {brief.title}
+                  </div>
+                  <div className="text-slate-300 text-xs leading-relaxed mt-2">
+                    {brief.summary}
+                  </div>
+
+                  <div className="border-t border-[#1a2744] mt-3 pt-2">
+                    <div className="text-slate-500 text-[10px] font-mono tracking-widest uppercase">
+                      CLASSIFICATION: UNCLASSIFIED // OPEN SOURCE
+                    </div>
+                    <div className="text-slate-500 text-[10px] font-mono mt-1 uppercase">
+                      Published: {mounted ? getRelativeTime(brief.published_at) : '...'} · {brief.region}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
 
       <div className="border-t border-[#1a2744] pt-3 mt-4 w-full">
-         <div className="text-center font-mono tracking-widest text-[10px] text-slate-600">
-            DATA SOURCES: AISSTREAM.IO · OPENSANCTIONS · IMB PIRACY REPORTING CENTRE · GLOBAL FISHING WATCH · COPERNICUS MARINE SERVICE
-         </div>
+        <div className="text-center font-mono tracking-widest text-[10px] text-slate-600">
+          DATA SOURCES: AISSTREAM.IO · OPENSANCTIONS · IMB PIRACY REPORTING CENTRE · GLOBAL FISHING WATCH · COPERNICUS MARINE SERVICE
+        </div>
       </div>
     </div>
   );
