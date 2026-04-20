@@ -10,6 +10,10 @@ export async function middleware(request: NextRequest) {
   if (request.nextUrl.pathname === '/api/intelligence-briefs/generate') {
     return NextResponse.next()
   }
+  // Skip for internal sync routes (Bearer-auth protected, no rate-limit needed)
+  if (request.nextUrl.pathname === '/api/sanctions-sync') {
+    return NextResponse.next()
+  }
   const forwarded = request.headers.get('x-forwarded-for')
   const ip = forwarded ? forwarded.split(',')[0].trim() : 'unknown'
 
