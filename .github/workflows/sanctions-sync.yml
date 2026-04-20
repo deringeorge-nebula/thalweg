@@ -1,0 +1,27 @@
+name: Daily Sanctions Sync
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # 2 AM UTC daily
+  workflow_dispatch:      # manual trigger from GitHub UI
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Run sanctions sync
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          MY_SERVICE_ROLE_KEY: ${{ secrets.MY_SERVICE_ROLE_KEY }}
+          OPENSANCTIONS_TOKEN: ${{ secrets.OPENSANCTIONS_TOKEN }}
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npx tsx src/scripts/sanctions-sync-local.ts
