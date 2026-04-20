@@ -184,8 +184,7 @@ function parseIdentifiers(raw: string): ParsedIdentifiers {
 
 function parseTopics(sanctionsRaw: string): string[] {
   if (!sanctionsRaw) return []
-  return [
-    ...new Set(
+  return Array.from(new Set(
       sanctionsRaw
         .split(';')
         .map((s) => s.trim())
@@ -195,8 +194,7 @@ function parseTopics(sanctionsRaw: string): string[] {
           return delimIdx !== -1 ? entry.slice(0, delimIdx).trim() : entry.trim()
         })
         .filter(Boolean)
-    ),
-  ]
+    ))
 }
 
 // ─── Row → Domain record ──────────────────────────────────────────────────────
