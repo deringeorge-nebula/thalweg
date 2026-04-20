@@ -1,21 +1,15 @@
 // supabase/functions/ais-relay/index.ts
-// AIS WebSocket Relay — Supabase Edge Function (Deno runtime)
-// Connects to AISStream.io server-side, writes to Supabase Postgres.
-// NEVER expose AISStream API key to browser.
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const AISSTREAM_WS_URL = "wss://stream.aisstream.io/v0/stream";
 const AISSTREAM_API_KEY = Deno.env.get("AISSTREAM_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-// FIX 1: Service Role Key Bypass
 const SERVICE_ROLE_KEY = Deno.env.get("MY_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
 });
 
-// ─── Vessel type classification ───────────────────────────────────────────────
 const VESSEL_TYPE_MAP: Record<number, { category: string; color: string }> = {
     30: { category: "Fishing", color: "#27AE60" },
     36: { category: "Sailing", color: "#BDC3C7" },
@@ -44,15 +38,13 @@ function classifyVessel(shipType: number): { category: string; color: string } {
     return { category: "Unknown", color: "#7F8C8D" };
 }
 
-// ─── Max physical speeds by category (knots) ──────────────────────────────────
 const MAX_SPEEDS: Record<string, number> = {
     Cargo: 22, Tanker: 18, Bulk: 16, Passenger: 28,
     "High Speed Craft": 45, Fishing: 15, Tug: 13, Unknown: 30,
 };
 
-// ─── Haversine distance (nautical miles) ──────────────────────────────────────
 function haversineNM(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const R = 3440.065; // Earth radius in nautical miles
+    const R = 3440.065;
     const dLat = (lat2 - lat1) * (Math.PI / 180);
     const dLon = (lon2 - lon1) * (Math.PI / 180);
     const a =
@@ -63,25 +55,21 @@ function haversineNM(lat1: number, lon1: number, lat2: number, lon2: number): nu
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// ─── In-memory state ──────────────────────────────────────────────────────────
 const vesselCache = new Map<string, {
     lat: number; lon: number; timestamp: number; lastPositionWrite: number;
 }>();
 
 const lastPositionWrite = new Map<string, number>();
-
-// FIX 2: Separate queues to solve the Foreign Key Violation
 const pendingVessels = new Map<string, Record<string, unknown>>();
 let pendingPositions: Record<string, unknown>[] = [];
 let batchFlushTimer: number | null = null;
 
 const MAX_CACHE_SIZE = 50_000;
-const POSITION_WRITE_INTERVAL_MS = 15 * 60 * 1000; // 15 min per vessel
-const BATCH_INTERVAL_MS = 2_000; // flush every 2 seconds
-const DEDUP_DISTANCE_DEG = 0.001; // ~100m
-const DEDUP_TIME_MS = 30_000; // 30 seconds
+const POSITION_WRITE_INTERVAL_MS = 15 * 60 * 1000;
+const BATCH_INTERVAL_MS = 2_000;
+const DEDUP_DISTANCE_DEG = 0.001;
+const DEDUP_TIME_MS = 30_000;
 
-// ─── Message parser + validator ───────────────────────────────────────────────
 interface AISMessage {
     MessageType: string;
     MetaData: {
@@ -94,49 +82,42 @@ interface AISMessage {
     };
     Message: {
         PositionReport?: {
-            Sog: number;
-            Cog: number;
-            TrueHeading: number;
-            NavigationalStatus: number;
-            Latitude: number;
-            Longitude: number;
+            Sog: number; Cog: number; TrueHeading: number;
+            NavigationalStatus: number; Latitude: number; Longitude: number;
         };
         ShipStaticData?: {
-            ImoNumber: number;
-            CallSign: string;
+            ImoNumber: number; CallSign: string;
             Dimension: { A: number; B: number; C: number; D: number };
-            TypeOfShipAndCargoCode: number;
-            Destination: string;
+            TypeOfShipAndCargoCode: number; Destination: string;
             Eta: { Month: number; Day: number; Hour: number; Minute: number };
+            Name: string;
         };
     };
 }
 
-function parseAndValidate(raw: string): {
-    mmsi: string; lat: number; lon: number; sog: number; cog: number;
-    trueHeading: number; navStatus: number; shipType: number;
-    vesselName: string; timestamp: number;
-} | null {
-    let msg: AISMessage;
-    try {
-        msg = JSON.parse(raw);
-    } catch {
-        return null;
-    }
-
-    if (!msg?.MetaData || !msg?.Message?.PositionReport) return null;
-
-    const meta = msg.MetaData;
-    const pos = msg.Message.PositionReport;
-
-    // FIX 3: Indestructible MMSI string parser
-    const rawMmsi = meta.MMSI_String || meta.MMSI?.toString();
+// Returns position update OR null; handles static data separately
+function getMmsi(msg: AISMessage): string | null {
+    const rawMmsi = msg.MetaData?.MMSI_String || msg.MetaData?.MMSI?.toString();
     if (!rawMmsi) return null;
     const mmsi = String(rawMmsi).trim().substring(0, 9);
-    if (mmsi.length < 5) return null;
+    return mmsi.length >= 5 ? mmsi : null;
+}
 
-    const lat = pos.Latitude ?? meta.latitude;
-    const lon = pos.Longitude ?? meta.longitude;
+function parsePositionReport(raw: string): {
+    mmsi: string; lat: number; lon: number; sog: number; cog: number;
+    trueHeading: number; navStatus: number; vesselName: string; timestamp: number;
+    type: "position";
+} | null {
+    let msg: AISMessage;
+    try { msg = JSON.parse(raw); } catch { return null; }
+    if (!msg?.MetaData || !msg?.Message?.PositionReport) return null;
+
+    const mmsi = getMmsi(msg);
+    if (!mmsi) return null;
+
+    const pos = msg.Message.PositionReport;
+    const lat = pos.Latitude ?? msg.MetaData.latitude;
+    const lon = pos.Longitude ?? msg.MetaData.longitude;
 
     if (lat === undefined || lon === undefined || (lat === 0 && lon === 0)) return null;
     if (lat > 90 || lat < -90 || lon > 180 || lon < -180) return null;
@@ -144,48 +125,71 @@ function parseAndValidate(raw: string): {
     const sog = (pos.Sog ?? 0) / 10;
     if (sog > 102.2) return null;
 
-    const cog = (pos.Cog ?? 0) / 10;
-    const trueHeading = pos.TrueHeading ?? 511;
-    const navStatus = pos.NavigationalStatus ?? 15;
-
     return {
-        mmsi, lat, lon, sog, cog, trueHeading, navStatus,
-        shipType: 0,
-        vesselName: (meta.ShipName ?? "").trim(),
-        timestamp: new Date(meta.time_utc).getTime() || Date.now(),
+        type: "position",
+        mmsi, lat, lon,
+        sog, cog: (pos.Cog ?? 0) / 10,
+        trueHeading: pos.TrueHeading ?? 511,
+        navStatus: pos.NavigationalStatus ?? 15,
+        vesselName: (msg.MetaData.ShipName ?? "").trim(),
+        timestamp: new Date(msg.MetaData.time_utc).getTime() || Date.now(),
     };
 }
 
-// ─── Batch flush to Supabase ──────────────────────────────────────────────────
+function parseStaticData(raw: string): {
+    mmsi: string; imoNumber: string | null; callSign: string | null;
+    shipType: number; vesselName: string;
+    dimA: number | null; dimB: number | null; dimC: number | null; dimD: number | null;
+    destination: string | null; type: "static";
+} | null {
+    let msg: AISMessage;
+    try { msg = JSON.parse(raw); } catch { return null; }
+    if (!msg?.Message?.ShipStaticData) return null;
+
+    const mmsi = getMmsi(msg);
+    if (!mmsi) return null;
+
+    const s = msg.Message.ShipStaticData;
+    const imoRaw = s.ImoNumber;
+    const imoNumber = imoRaw && imoRaw > 0 ? String(imoRaw) : null;
+
+    return {
+        type: "static",
+        mmsi,
+        imoNumber,
+        callSign: s.CallSign?.trim() || null,
+        shipType: s.TypeOfShipAndCargoCode ?? 0,
+        vesselName: (s.Name ?? msg.MetaData?.ShipName ?? "").trim(),
+        dimA: s.Dimension?.A || null,
+        dimB: s.Dimension?.B || null,
+        dimC: s.Dimension?.C || null,
+        dimD: s.Dimension?.D || null,
+        destination: s.Destination?.trim() || null,
+    };
+}
+
 async function flushBatch() {
     if (pendingVessels.size === 0) return;
-
-    // Lock the queues
     const vesselsArray = Array.from(pendingVessels.values());
     const positionsArray = [...pendingPositions];
-
     pendingVessels.clear();
     pendingPositions = [];
     batchFlushTimer = null;
 
     try {
-        // FIX 2 (cont.): Write vessels FIRST
         const { error: vErr } = await supabase
             .from("vessels")
             .upsert(vesselsArray, { onConflict: "mmsi", ignoreDuplicates: false });
-
         if (vErr) throw new Error(vErr.message);
 
-        // Then write positions SECOND
         if (positionsArray.length > 0) {
             const { error: pErr } = await supabase
                 .from("vessel_positions")
                 .insert(positionsArray);
-
             if (pErr) throw new Error(pErr.message);
         }
-    } catch (e: any) {
-        console.error("[ais-relay] Batch flush exception:", e.message);
+    } catch (e: unknown) {
+        console.error("[ais-relay] Batch flush exception:", (e as Error).message);
     }
 }
 
@@ -194,11 +198,10 @@ function scheduleBatchFlush() {
     batchFlushTimer = setTimeout(flushBatch, BATCH_INTERVAL_MS) as unknown as number;
 }
 
-// ─── Update system_jobs heartbeat ────────────────────────────────────────────
 let lastHeartbeat = 0;
 async function heartbeat() {
     const now = Date.now();
-    if (now - lastHeartbeat < 5 * 60 * 1000) return; // every 5 min
+    if (now - lastHeartbeat < 5 * 60 * 1000) return;
     lastHeartbeat = now;
     await supabase.from("system_jobs").upsert({
         job_name: "ais-relay",
@@ -210,60 +213,57 @@ async function heartbeat() {
     }, { onConflict: "job_name" });
 }
 
-// ─── Process a single parsed AIS message ─────────────────────────────────────
-async function processMessage(parsed: NonNullable<ReturnType<typeof parseAndValidate>>) {
+async function processPositionMessage(parsed: NonNullable<ReturnType<typeof parsePositionReport>>) {
     const { mmsi, lat, lon, sog, cog, trueHeading, navStatus, vesselName, timestamp } = parsed;
-
     const cached = vesselCache.get(mmsi);
 
-    // ── Deduplication ────────────────────────────────────────────────────────────
     if (cached) {
         const timeDelta = timestamp - cached.timestamp;
         const latDelta = Math.abs(lat - cached.lat);
         const lonDelta = Math.abs(lon - cached.lon);
-        const positionUnchanged = latDelta < DEDUP_DISTANCE_DEG && lonDelta < DEDUP_DISTANCE_DEG;
-        if (positionUnchanged && timeDelta < DEDUP_TIME_MS) return; // duplicate, skip
+        if (latDelta < DEDUP_DISTANCE_DEG && lonDelta < DEDUP_DISTANCE_DEG && timeDelta < DEDUP_TIME_MS) return;
 
-        // ── Spoofing check ──────────────────────────────────────────────────────────
         if (timeDelta > 180_000) {
             const distNM = haversineNM(cached.lat, cached.lon, lat, lon);
-            const timeHours = timeDelta / 3_600_000;
-            const impliedSpeed = distNM / timeHours;
-            const maxSpeed = MAX_SPEEDS["Unknown"];
-            if (impliedSpeed > maxSpeed * 1.5) {
-                console.warn(`[ais-relay] Spoofed position detected MMSI=${mmsi} implied=${impliedSpeed.toFixed(1)}kn`);
+            const impliedSpeed = distNM / (timeDelta / 3_600_000);
+            if (impliedSpeed > MAX_SPEEDS["Unknown"] * 1.5) {
+                console.warn(`[ais-relay] Spoofed position MMSI=${mmsi} implied=${impliedSpeed.toFixed(1)}kn`);
                 return;
             }
         }
     }
 
-    // ── Manage cache size ────────────────────────────────────────────────────────
     if (vesselCache.size >= MAX_CACHE_SIZE && !cached) {
         const firstKey = vesselCache.keys().next().value;
         if (firstKey) vesselCache.delete(firstKey);
     }
 
-    // ── Update in-memory cache ───────────────────────────────────────────────────
     const localLastPosWrite = cached?.lastPositionWrite ?? 0;
     vesselCache.set(mmsi, { lat, lon, timestamp, lastPositionWrite: localLastPosWrite });
 
-    const classification = classifyVessel(parsed.shipType);
+    const classification = classifyVessel(0);
 
-    // ── Queue vessel upsert ───────────────────────────────────────────────────────
+    // Merge with existing pending vessel to preserve static data fields
+    const existing = pendingVessels.get(mmsi) ?? {};
     pendingVessels.set(mmsi, {
-        mmsi, lat, lon, sog, cog, true_heading: trueHeading === 511 ? null : trueHeading,
-        nav_status: navStatus, vessel_name: vesselName || undefined,
-        type_category: classification.category, type_color: classification.color,
-        is_active: true, last_update: new Date(timestamp).toISOString(),
+        ...existing,
+        mmsi, lat, lon, sog, cog,
+        true_heading: trueHeading === 511 ? null : trueHeading,
+        nav_status: navStatus,
+        vessel_name: vesselName || existing.vessel_name || undefined,
+        type_category: existing.type_category || classification.category,
+        type_color: existing.type_color || classification.color,
+        is_active: true,
+        last_update: new Date(timestamp).toISOString(),
     });
 
-    // ── Queue position history ────────────────────────────────────────────────────
     const now = Date.now();
     const lastWrite = lastPositionWrite.get(mmsi) ?? 0;
     if (now - lastWrite >= POSITION_WRITE_INTERVAL_MS) {
         lastPositionWrite.set(mmsi, now);
         pendingPositions.push({
-            mmsi, lat, lon, sog, cog, nav_status: navStatus, recorded_at: new Date().toISOString(),
+            mmsi, lat, lon, sog, cog, nav_status: navStatus,
+            recorded_at: new Date().toISOString(),
         });
     }
 
@@ -271,27 +271,46 @@ async function processMessage(parsed: NonNullable<ReturnType<typeof parseAndVali
     await heartbeat();
 }
 
+async function processStaticMessage(parsed: NonNullable<ReturnType<typeof parseStaticData>>) {
+    const { mmsi, imoNumber, callSign, shipType, vesselName, dimA, dimB, dimC, dimD, destination } = parsed;
+    const classification = classifyVessel(shipType);
+
+    // Merge with existing pending vessel
+    const existing = pendingVessels.get(mmsi) ?? {};
+    pendingVessels.set(mmsi, {
+        ...existing,
+        mmsi,
+        ...(imoNumber ? { imo_number: imoNumber } : {}),
+        ...(callSign ? { call_sign: callSign } : {}),
+        ...(vesselName ? { vessel_name: vesselName } : {}),
+        ...(destination ? { destination } : {}),
+        ship_type: shipType,
+        type_category: classification.category,
+        type_color: classification.color,
+        ...(dimA ? { dim_a: dimA, dim_b: dimB, length_m: (dimA ?? 0) + (dimB ?? 0) } : {}),
+        ...(dimC ? { dim_c: dimC, dim_d: dimD, beam_m: (dimC ?? 0) + (dimD ?? 0) } : {}),
+        last_update: new Date().toISOString(),
+    });
+
+    scheduleBatchFlush();
+}
+
+// Subscribe to BOTH PositionReport AND ShipStaticData
 const SUBSCRIPTION_PAYLOAD = JSON.stringify({
     APIKey: AISSTREAM_API_KEY,
     BoundingBoxes: [[[-90, -180], [90, 180]]],
-    FilterMessageTypes: ["PositionReport"],
+    FilterMessageTypes: ["PositionReport", "ShipStaticData"],
 });
 
-// ─── Cleanup: delete positions older than 24h ─────────────────────────────
 async function cleanOldPositions() {
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-  const { error } = await supabase
-    .from("vessel_positions")
-    .delete()
-    .lt("recorded_at", cutoff)
-    
-  if (error) console.error("[ais-relay] Cleanup error:", error.message)
-  else console.log("[ais-relay] Old positions cleaned")
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { error } = await supabase.from("vessel_positions").delete().lt("recorded_at", cutoff);
+    if (error) console.error("[ais-relay] Cleanup error:", error.message);
+    else console.log("[ais-relay] Old positions cleaned");
 }
 
-// Run cleanup every hour
-setInterval(cleanOldPositions, 60 * 60 * 1000)
-cleanOldPositions() // Also run once on startup
+setInterval(cleanOldPositions, 60 * 60 * 1000);
+cleanOldPositions();
 
 let consecutiveFailures = 0;
 const MAX_BACKOFF_MS = 60_000;
@@ -317,25 +336,28 @@ async function connect() {
 
     ws.onopen = () => {
         consecutiveFailures = 0;
-        console.log("[ais-relay] Connected. Subscribing to global AIS stream...");
+        console.log("[ais-relay] Connected. Subscribing...");
         ws.send(SUBSCRIPTION_PAYLOAD);
     };
 
     ws.onmessage = async (event: MessageEvent) => {
-        // FIX 4: Indestructible Blob/Buffer decoder
         let raw = "";
         if (typeof event.data === "string") raw = event.data;
         else if (event.data instanceof ArrayBuffer) raw = new TextDecoder().decode(event.data);
         else if (event.data instanceof Blob) raw = await event.data.text();
         else raw = String(event.data);
 
-        const parsed = parseAndValidate(raw);
-        if (parsed) await processMessage(parsed);
+        // Try position first, then static
+        const position = parsePositionReport(raw);
+        if (position) { await processPositionMessage(position); return; }
+
+        const staticData = parseStaticData(raw);
+        if (staticData) { await processStaticMessage(staticData); }
     };
 
     ws.onclose = (event: CloseEvent) => {
         consecutiveFailures++;
-        console.log(`[ais-relay] Connection closed. Code=${event.code}. Scheduling reconnect...`);
+        console.log(`[ais-relay] Closed. Code=${event.code}. Reconnecting...`);
         connect();
     };
 
@@ -344,10 +366,8 @@ async function connect() {
     };
 }
 
-// ─── Edge Function entry point ────────────────────────────────────────────────
 Deno.serve(async (_req: Request) => {
     connect();
-    // FIX 5: 30-Second keep-alive so the cloud doesn't drop the connection
     await new Promise((resolve) => setTimeout(resolve, 30000));
     return new Response(
         JSON.stringify({ status: "ais-relay started", vessels_cached: vesselCache.size }),
