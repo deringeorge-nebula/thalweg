@@ -2,22 +2,21 @@ name: Daily Sanctions Sync
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 2 AM UTC daily
-  workflow_dispatch:      # manual trigger from GitHub UI
+    - cron: '0 2 * * *'
+  workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
-
       - run: npm ci
-
       - name: Run sanctions sync
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}

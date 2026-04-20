@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from '@supabase/supabase-js'
 import { parse } from 'csv-parse'
 import { Readable } from 'stream'
@@ -22,10 +23,12 @@ function extractMMSI(identifiers: string): string | null {
   return match ? match[1] : null
 }
 
-async function upsertBatch(rows: Record<string, any>[]) {
-  // Deduplicate by imo_number — keep last occurrence
+async function upsertBatch(rows: Record<string, unknown>[]) {
   const deduped = Object.values(
-    rows.reduce((acc, row) => { acc[row.imo_number] = row; return acc }, {} as Record<string, any>)
+    rows.reduce((acc, row) => {
+      acc[row.imo_number as string] = row
+      return acc
+    }, {} as Record<string, Record<string, unknown>>)
   )
   const { error } = await supabase
     .from('sanctioned_vessels')
@@ -51,14 +54,14 @@ async function run() {
   if (!res.body) throw new Error('No response body')
 
   const parser = parse({ columns: true, skip_empty_lines: true })
-  const nodeStream = Readable.fromWeb(res.body as any)
+  const nodeStream = Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0])
   nodeStream.pipe(parser)
 
-  let batch: Record<string, any>[] = []
+  let batch: Record<string, unknown>[] = []
   let total = 0
   let skipped = 0
 
-  for await (const row of parser as AsyncIterable<any>) {
+  for await (const row of parser as AsyncIterable<Record<string, string>>) {
     if (row.schema !== 'Vessel') continue
 
     const imo = extractIMO(row.identifiers || '')
