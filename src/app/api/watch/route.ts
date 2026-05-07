@@ -4,10 +4,12 @@ import { standardRatelimit, getClientIp } from '@/lib/ratelimit'
 
 export const dynamic = 'force-dynamic'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
-  process.env.MY_SERVICE_ROLE_KEY ?? ''
-)
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) throw new Error('Supabase configuration missing')
+  return createClient(url, key)
+}
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request)
@@ -30,7 +32,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Valid email is required' }, { status: 400 })
   }
 
-  const { error } = await supabase
+  const { error } = await getSupabaseAdmin()
     .from('watched_vessels')
     .upsert({
       mmsi,
@@ -67,7 +69,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'mmsi and email required' }, { status: 400 })
   }
 
-  const { error } = await supabase
+  const { error } = await getSupabaseAdmin()
     .from('watched_vessels')
     .update({ is_active: false })
     .eq('mmsi', mmsi)

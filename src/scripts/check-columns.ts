@@ -10,11 +10,11 @@ async function run() {
   const location = redirect.headers.get('location')!
   const res = await fetch(location)
   const parser = parse({ columns: true, skip_empty_lines: true })
-  const nodeStream = Readable.fromWeb(res.body as any)
+  const nodeStream = Readable.fromWeb(res.body as ReadableStream<Uint8Array>)
   nodeStream.pipe(parser)
 
   let count = 0
-  for await (const row of parser as AsyncIterable<any>) {
+  for await (const row of parser as AsyncIterable<Record<string, string>>) {
     if (row.schema !== 'Vessel') continue
     console.log('COLUMNS:', Object.keys(row))
     console.log('SAMPLE:', JSON.stringify(row, null, 2))

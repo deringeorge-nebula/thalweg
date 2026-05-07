@@ -5,6 +5,13 @@ import { createClient } from '@supabase/supabase-js'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
+function getSupabaseAdmin() {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!url || !key) throw new Error('Supabase configuration missing')
+    return createClient(url, key, { auth: { persistSession: false } })
+}
+
 const VALID_REGIONS = [
     'GLOBAL', 'INDIAN OCEAN', 'RED SEA',
     'PERSIAN GULF', 'MEDITERRANEAN', 'ATLANTIC', 'PACIFIC'
@@ -24,11 +31,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'region is required', valid: VALID_REGIONS }, { status: 400 })
     }
 
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.MY_SERVICE_ROLE_KEY!,
-        { auth: { persistSession: false } }
-    )
+    const supabase = getSupabaseAdmin()
 
     const today = new Date().toISOString().split('T')[0]
 

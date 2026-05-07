@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 export const config = {
@@ -17,7 +17,7 @@ export async function middleware(request: NextRequest) {
   const forwarded = request.headers.get('x-forwarded-for')
   const ip = forwarded ? forwarded.split(',')[0].trim() : 'unknown'
 
-  // SHA-256 hash the IP for privacy — store hash, not raw IP
+  // SHA-256 hash the IP for privacy â€” store hash, not raw IP
   const encoder = new TextEncoder()
   const ipBytes = encoder.encode(ip + (process.env.RATE_LIMIT_SALT ?? 'thalweg'))
   const hashBuffer = await crypto.subtle.digest('SHA-256', ipBytes)
@@ -33,7 +33,7 @@ export async function middleware(request: NextRequest) {
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.MY_SERVICE_ROLE_KEY!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { persistSession: false } }
   )
 
@@ -86,3 +86,4 @@ export async function middleware(request: NextRequest) {
 
   return response
 }
+

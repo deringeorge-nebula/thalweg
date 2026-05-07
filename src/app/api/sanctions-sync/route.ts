@@ -1,31 +1,31 @@
-/**
+﻿/**
  * /api/sanctions-sync
  *
  * Daily batch sync of OpenSanctions vessel data into Supabase.
  * Each POST invocation processes ONE batch of rows from the CSV stream.
- * Designed for Vercel Hobby 10s limit — each invocation targets < 8s.
+ * Designed for Vercel Hobby 10s limit â€” each invocation targets < 8s.
  *
- * POST  { batch: number, batch_size?: number }  — requires Authorization header
- * GET   — returns endpoint documentation (no auth)
+ * POST  { batch: number, batch_size?: number }  â€” requires Authorization header
+ * GET   â€” returns endpoint documentation (no auth)
  */
 
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
-// ─── Runtime config ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Runtime config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 9 // seconds (Vercel Hobby cap is 10)
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const OPENSANCTIONS_URL =
   'https://delivery.opensanctions.com/datasets/latest/default/targets.simple.csv'
 const DEFAULT_BATCH_SIZE = 200
 const FETCH_TIMEOUT_MS = 7_000
 
-// ─── Interfaces ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Interfaces â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface RequestBody {
   batch: number
@@ -82,12 +82,12 @@ interface SupabaseError {
   details?: string
 }
 
-// ─── CSV PARSER (RFC 4180 compliant) ─────────────────────────────────────────
+// â”€â”€â”€ CSV PARSER (RFC 4180 compliant) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 //
 // Handles:
-//  • Quoted fields (may contain commas, newlines, semicolons)
-//  • Escaped double-quotes ("") inside quoted fields
-//  • Trailing \r\n or \n line endings
+//  â€¢ Quoted fields (may contain commas, newlines, semicolons)
+//  â€¢ Escaped double-quotes ("") inside quoted fields
+//  â€¢ Trailing \r\n or \n line endings
 
 type ParserState = 'FIELD_START' | 'IN_UNQUOTED' | 'IN_QUOTED' | 'POST_QUOTE'
 
@@ -153,7 +153,7 @@ function parseCSVLine(line: string): string[] {
   return fields
 }
 
-// ─── Identifier parsing ───────────────────────────────────────────────────────
+// â”€â”€â”€ Identifier parsing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface ParsedIdentifiers {
   imo_number: string | null
@@ -180,7 +180,7 @@ function parseIdentifiers(raw: string): ParsedIdentifiers {
   return result
 }
 
-// ─── Sanctions string parsing ─────────────────────────────────────────────────
+// â”€â”€â”€ Sanctions string parsing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function parseTopics(sanctionsRaw: string): string[] {
   if (!sanctionsRaw) return []
@@ -199,7 +199,7 @@ function parseTopics(sanctionsRaw: string): string[] {
   )
 }
 
-// ─── Row → Domain record ──────────────────────────────────────────────────────
+// â”€â”€â”€ Row â†’ Domain record â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function rowToRecord(cols: string[]): SanctionRecord | null {
   // Guard minimum column count
@@ -220,7 +220,7 @@ function rowToRecord(cols: string[]): SanctionRecord | null {
     .filter(Boolean)
 
   const countriesRaw = cols[5]?.trim() ?? ''
-  const flag_state = countriesRaw.split(';')[0]?.trim().slice(0, 2) || null
+  const flag_state = countriesRaw.split(';')[0]?.trim() || null
 
   const datasets = (cols[12]?.trim() ?? '')
     .split(';')
@@ -250,11 +250,11 @@ function rowToRecord(cols: string[]): SanctionRecord | null {
   }
 }
 
-// ─── Supabase client (service role) ──────────────────────────────────────────
+// â”€â”€â”€ Supabase client (service role) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.MY_SERVICE_ROLE_KEY
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) {
     throw new Error('Missing Supabase environment variables')
   }
@@ -263,7 +263,7 @@ function getSupabaseAdmin() {
   })
 }
 
-// ─── Auth helper ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Auth helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function isAuthorized(req: NextRequest): boolean {
   const authHeader = req.headers.get('authorization') ?? ''
@@ -272,7 +272,7 @@ function isAuthorized(req: NextRequest): boolean {
   return token.length > 0 && token === secret
 }
 
-// ─── GET — documentation ──────────────────────────────────────────────────────
+// â”€â”€â”€ GET â€” documentation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function GET(): Promise<NextResponse> {
   return NextResponse.json({
@@ -283,26 +283,26 @@ export async function GET(): Promise<NextResponse> {
     method: 'POST',
     authentication: 'Authorization: Bearer {CRON_SECRET}',
     body: {
-      batch: 'number  — 0-indexed batch number',
-      batch_size: 'number? — rows per batch (default: 200)',
+      batch: 'number  â€” 0-indexed batch number',
+      batch_size: 'number? â€” rows per batch (default: 200)',
     },
     response: {
       batch: 'number',
-      processed: 'number — vessel rows consumed in this batch',
-      upserted: 'number — rows written to sanctions table',
-      skipped: 'number  — rows without IMO or MMSI',
+      processed: 'number â€” vessel rows consumed in this batch',
+      upserted: 'number â€” rows written to sanctions table',
+      skipped: 'number  â€” rows without IMO or MMSI',
       errors: 'number',
-      done: 'boolean — true when no more batches remain',
+      done: 'boolean â€” true when no more batches remain',
     },
     batchingStrategy:
-      'Run batch 0 through 44 sequentially (45 × 200 = 9 000 rows). ' +
+      'Run batch 0 through 44 sequentially (45 Ã— 200 = 9 000 rows). ' +
       'Each invocation streams the CSV, skips to the correct offset, ' +
       'and stops after batch_size Vessel rows.',
     dataSource: OPENSANCTIONS_URL,
   })
 }
 
-// ─── POST — batch processor ───────────────────────────────────────────────────
+// â”€â”€â”€ POST â€” batch processor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   // 1. Auth check
@@ -382,7 +382,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const chunk = remainder + decoder.decode(value, { stream: true })
       const lines = chunk.split('\n')
 
-      // The last element may be an incomplete line — carry it forward
+      // The last element may be an incomplete line â€” carry it forward
       remainder = lines.pop() ?? ''
 
       for (const rawLine of lines) {
@@ -462,7 +462,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   let dbErrors = 0
 
   if (records.length > 0) {
-    // ── 5a. Upsert into sanctions table ──────────────────────────────────────
+    // â”€â”€ 5a. Upsert into sanctions table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const sanctionsRows = records.map((r) => ({
       opensanctions_id: r.opensanctions_id,
       name: r.name,
@@ -498,7 +498,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'db_error', detail: message }, { status: 500 })
     }
 
-    // ── 5b. Flag matched vessels in the vessels table ─────────────────────────
+    // â”€â”€ 5b. Flag matched vessels in the vessels table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const mmsiList = records.map((r) => r.mmsi).filter((m): m is string => m !== null)
     const imoList = records.map((r) => r.imo_number).filter((i): i is string => i !== null)
 
@@ -535,7 +535,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // ── 5c. Upsert into sanctioned_vessels table ──────────────────────────────
+    // â”€â”€ 5c. Upsert into sanctioned_vessels table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const sanctionedRows: SanctionedVesselRecord[] = records.map((r) => ({
       mmsi: r.mmsi,
       imo_number: r.imo_number,
@@ -555,7 +555,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         .upsert(sanctionedRows, { onConflict: 'mmsi,imo_number' })
 
       if (svError) {
-        // Non-fatal — increment error count but don't abort
+        // Non-fatal â€” increment error count but don't abort
         dbErrors++
       }
     } catch {
@@ -578,3 +578,4 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   return NextResponse.json(result, { status: 200 })
 }
+

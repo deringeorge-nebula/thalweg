@@ -63,6 +63,7 @@ const lastPositionWrite = new Map<string, number>();
 const pendingVessels = new Map<string, Record<string, unknown>>();
 let pendingPositions: Record<string, unknown>[] = [];
 let batchFlushTimer: number | null = null;
+let flushing = false;
 
 const MAX_CACHE_SIZE = 50_000;
 const POSITION_WRITE_INTERVAL_MS = 15 * 60 * 1000;
@@ -169,18 +170,29 @@ function parseStaticData(raw: string): {
 }
 
 async function flushBatch() {
-    if (pendingVessels.size === 0) return;
-    const vesselsArray = Array.from(pendingVessels.values());
-    const positionsArray = [...pendingPositions];
-    pendingVessels.clear();
-    pendingPositions = [];
-    batchFlushTimer = null;
-
+    if (flushing) return;           // prevents concurrent flushes
+    flushing = true;
     try {
-        const { error: vErr } = await supabase
-            .from("vessels")
-            .upsert(vesselsArray, { onConflict: "mmsi", ignoreDuplicates: false });
-        if (vErr) throw new Error(vErr.message);
+        const vesselsArray = Array.from(pendingVessels.values());
+        const positionsArray = [...pendingPositions];
+        pendingVessels.clear();
+        pendingPositions.length = 0;
+        batchFlushTimer = null;
+
+        // ✅ Hard filter — never attempt to upsert a vessel without lat/lon
+        // ✅ Consistent MMSI order — secondary deadlock safeguard
+        const validVessels = vesselsArray
+            .filter((v) => v.lat != null && v.lon != null)
+            .sort((a, b) => String(a.mmsi).localeCompare(String(b.mmsi)));
+
+        if (validVessels.length === 0 && positionsArray.length === 0) return;
+
+        if (validVessels.length > 0) {
+            const { error: vErr } = await supabase
+                .from("vessels")
+                .upsert(validVessels, { onConflict: "mmsi", ignoreDuplicates: false });
+            if (vErr) throw new Error(vErr.message);
+        }
 
         if (positionsArray.length > 0) {
             const { error: pErr } = await supabase
@@ -190,6 +202,8 @@ async function flushBatch() {
         }
     } catch (e: unknown) {
         console.error("[ais-relay] Batch flush exception:", (e as Error).message);
+    } finally {
+        flushing = false;           // always release the lock
     }
 }
 
@@ -267,12 +281,31 @@ async function processPositionMessage(parsed: NonNullable<ReturnType<typeof pars
         });
     }
 
+    // Cap: flush early if batch is getting too large
+    if (pendingVessels.size >= 300 || pendingPositions.length >= 500) {
+        if (batchFlushTimer !== null) {
+            clearTimeout(batchFlushTimer);
+            batchFlushTimer = null;
+        }
+        flushBatch();
+    }
+
     scheduleBatchFlush();
     await heartbeat();
 }
 
 async function processStaticMessage(parsed: NonNullable<ReturnType<typeof parseStaticData>>) {
     const { mmsi, imoNumber, callSign, shipType, vesselName, dimA, dimB, dimC, dimD, destination } = parsed;
+
+    // Guard: only enqueue if we already have a known position for this MMSI.
+    // lat/lon are NOT NULL in the vessels table, so a static-only upsert would
+    // violate the constraint. Static data will naturally re-arrive paired with
+    // a PositionReport once the vessel starts transmitting positions.
+    const hasPositionInCache = vesselCache.has(mmsi);
+    const existingPending = pendingVessels.get(mmsi);
+    const hasPositionInPending = existingPending != null && existingPending.lat != null;
+    if (!hasPositionInCache && !hasPositionInPending) return;
+
     const classification = classifyVessel(shipType);
 
     // Merge with existing pending vessel
