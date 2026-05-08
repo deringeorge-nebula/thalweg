@@ -1,4 +1,4 @@
-// src/app/api/intelligence-briefs/generate/route.ts
+﻿// src/app/api/intelligence-briefs/generate/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -21,7 +21,7 @@ type ValidRegion = typeof VALID_REGIONS[number]
 
 export async function POST(request: NextRequest) {
     const auth = request.headers.get('authorization')
-    if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
