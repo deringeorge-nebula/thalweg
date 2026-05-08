@@ -1,12 +1,1 @@
-﻿{
-  "crons": [
-    {
-      "path": "/api/sanctions-sync",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/intelligence-briefs/generate",
-      "schedule": "0 3 * * *"
-    }
-  ]
-}
+﻿{}
